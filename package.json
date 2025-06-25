@@ -1,0 +1,48 @@
+{
+  "name": "@summitx/token-quoter",
+  "version": "1.0.0",
+  "description": "Token swap quoter for Base testnet using SummitX smart-router",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev:simple": "tsx src/simple-example.ts",
+    "dev": "tsup && tsx src/single-smart-router-example.ts",
+    "dev:smart:multiple": "tsup && tsx src/multiple-smart-router-example.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "clean": "rm -rf dist && rm -rf node_modules"
+  },
+  "dependencies": {
+    "@summitx/chains": "D:/code/Summitx/interface/packages/chains",
+    "@summitx/multicall": "D:/code/Summitx/interface/packages/multicall",
+    "@summitx/smart-router": "D:/code/Summitx/interface/packages/smart-router",
+    "@summitx/swap-sdk-core": "D:/code/Summitx/interface/packages/swap-sdk-core",
+    "@summitx/tokens": "D:/code/Summitx/interface/packages/tokens",
+    "@summitx/v3-sdk": "D:/code/Summitx/interface/packages/v3-sdk",
+    "@summitx/sdk":"D:/code/Summitx/interface/packages/sdk",
+    "chalk": "^5.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "graphql-request": "^5.0.0",
+    "readline-sync": "^1.4.10",
+    "viem": "1.15.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@types/readline-sync": "^1.4.8",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "eslint": "^8.54.0",
+    "tsup": "^8.0.1",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

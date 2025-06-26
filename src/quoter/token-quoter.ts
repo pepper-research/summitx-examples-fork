@@ -244,10 +244,39 @@ export class TokenQuoter {
       new Percent(10000 - Math.floor(Number(slippagePercent.numerator.toString())), 10000)
     )
 
-    // Get route path
-    const routePath = trade.routes.map((route: any) => 
-      route.path.map((token: any) => token.symbol || "Unknown").join(" → ")
-    )
+    // Get route path 
+    const routePath = trade.routes.map((route: any) => {
+      const pathSegments = []
+      
+      for (let i = 0; i < route.path.length - 1; i++) {
+        const currentToken = route.path[i]
+        const nextToken = route.path[i + 1]
+
+        const pool = route.pools[i]
+        
+        
+        let poolInfo = "Unknown"
+        if (pool) {
+          if (pool.type === 0) {
+            poolInfo = "V2"
+          } else if (pool.type === 1) {
+            const fee = pool.fee || "Unknown"
+            poolInfo = `V3 feetire ${typeof fee === 'bigint' ? Number(fee)/10000 : fee/10000}%`
+          }
+          
+          if (pool.address) {
+            poolInfo += ` ${pool.address}`
+          }
+        }
+        
+        pathSegments.push(`${currentToken.symbol || "Unknown"}-${nextToken.symbol || "Unknown"} ${poolInfo}`)
+      }
+      
+      const pathString = pathSegments.join(", ")
+      const percent = route.percent || 0
+      
+      return `(${percent}% [${pathString}])`
+    })
 
     // Get pool info
     const pools: string[] = []

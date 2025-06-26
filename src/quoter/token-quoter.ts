@@ -278,7 +278,7 @@ export class TokenQuoter {
             poolInfo = "V2"
           } else if (pool.type === 1) {
             const fee = pool.fee || "Unknown"
-            poolInfo = `V3 feetire ${typeof fee === 'bigint' ? Number(fee)/10000 : fee/10000}%`
+            poolInfo = `V3 ${typeof fee === 'bigint' ? Number(fee)/10000 : fee/10000}%`
           }
           
           if (pool.address) {

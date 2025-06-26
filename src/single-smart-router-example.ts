@@ -40,7 +40,9 @@ async function main() {
       poolsUsed: quote1.pools.length,
       gasEstimate: quote1.gasEstimate || "N/A",
       pools: quote1.pools,
-      
+      timing: {
+        router: quote1.routerTime || "N/A",
+      }
     })
   }
 

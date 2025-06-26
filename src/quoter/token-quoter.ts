@@ -41,6 +41,7 @@ export interface QuoteResult {
   gasEstimate?: string
   executionPrice: string
   minimumReceived: string
+  routerTime?: string
 }
 
 export class TokenQuoter {
@@ -78,6 +79,9 @@ export class TokenQuoter {
     tradeType: TradeType = TradeType.EXACT_INPUT,
     shouldAdjustQuoteForGas?: boolean | true
   ): Promise<QuoteResult | null> {
+    const startTime = Date.now()
+    let routerStartTime: number
+    
     try {
       logger.info("Getting quote... with shouldAdjustQuoteForGas", {
         inputToken: inputToken.symbol,
@@ -127,6 +131,7 @@ export class TokenQuoter {
         // Use dynamic pool provider that fetches candidate pools
         poolProvider = {
           getCandidatePools: async (params: { currencyA?: Currency, currencyB?: Currency }) => {
+            const poolFetchStartTime = Date.now()
             try {
               logger.debug(`Fetching candidate pools for ${params.currencyA?.symbol} -> ${params.currencyB?.symbol}`)
               
@@ -147,11 +152,13 @@ export class TokenQuoter {
                 }),
               ])
 
-              logger.debug(`Found ${v2Pools.length} V2 pools and ${v3Pools.length} V3 pools`)
+              const poolFetchTime = Date.now() - poolFetchStartTime
+              logger.debug(`Found ${v2Pools.length} V2 pools and ${v3Pools.length} V3 pools in ${poolFetchTime}ms`)
               
               return [...v2Pools, ...v3Pools]
             } catch (error) {
-              logger.warn("Failed to fetch candidate pools, using empty array", error)
+              const poolFetchTime = Date.now() - poolFetchStartTime
+              logger.warn(`Failed to fetch candidate pools in ${poolFetchTime}ms, using empty array`, error)
               return []
             }
           }
@@ -171,8 +178,10 @@ export class TokenQuoter {
       }
 
       // Get best trade
-      logger.info("tradedata", {inputAmount: inputAmount.toExact(),inputToken: inputToken.symbol, outputToken: outputToken.symbol, tradeType, tradeConfig, shouldAdjustQuoteForGas})
+      // logger.info("tradedata", {inputAmount: inputAmount.toExact(),inputToken: inputToken.symbol, outputToken: outputToken.symbol, tradeType, tradeConfig, shouldAdjustQuoteForGas})
 
+      routerStartTime = Date.now()
+      
       const trade = await SmartRouter.getBestTrade(
         inputAmount,
         outputToken,
@@ -180,6 +189,9 @@ export class TokenQuoter {
         tradeConfig,
         shouldAdjustQuoteForGas
       )
+
+      const routerTime = Date.now() - routerStartTime
+      logger.info(`Router operation completed in ${routerTime}ms`)
 
       if (!trade) {
         logger.warn("No trade route found")
@@ -193,17 +205,21 @@ export class TokenQuoter {
       )
 
       // Format results
-      const result = this.formatQuoteResult(trade, inputAmountRaw, slippagePercent)
+      const result = this.formatQuoteResult(trade, inputAmountRaw, slippagePercent, routerTime)
       
+      const totalTime = Date.now() - startTime
       logger.success("Quote found!", {
         outputAmount: result.outputAmount,
         priceImpact: result.priceImpact,
         route: result.route.join(" → "),
+        routerTime: `${routerTime}ms`,
+        totalTime: `${totalTime}ms`
       })
 
       return result
     } catch (error) {
-      logger.error("Failed to get quote", error)
+      const totalTime = Date.now() - startTime
+      logger.error(`Failed to get quote after ${totalTime}ms`, error)
       return null
     }
   }
@@ -234,7 +250,8 @@ export class TokenQuoter {
   private formatQuoteResult(
     trade: SmartRouterTrade<TradeType>,
     inputAmountRaw: string,
-    slippagePercent: Percent
+    slippagePercent: Percent,
+    routerTime: number
   ): QuoteResult {
     const inputToken = trade.inputAmount.currency
     const outputToken = trade.outputAmount.currency
@@ -317,6 +334,7 @@ export class TokenQuoter {
         BigInt(outputAmountWithSlippage.quotient.toString()),
         outputToken.decimals
       ),
+      routerTime: `${routerTime}ms`,
     }
   }
 }

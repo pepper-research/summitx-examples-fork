@@ -112,8 +112,8 @@ export class TokenQuoter {
       if (this.options.useMockPools) {
         // Use mock pools for testing
         poolProvider = {
-          getCandidatePools: async ({ currencyA, currencyB }) => {
-            logger.debug(`Using mock pools for ${currencyA?.symbol} -> ${currencyB?.symbol}`)
+          getCandidatePools: async (params: { currencyA?: Currency, currencyB?: Currency }) => {
+            logger.debug(`Using mock pools for ${params.currencyA?.symbol} -> ${params.currencyB?.symbol}`)
             // Return empty array to simulate no pools found
             return []
           }
@@ -126,23 +126,23 @@ export class TokenQuoter {
       } else {
         // Use dynamic pool provider that fetches candidate pools
         poolProvider = {
-          getCandidatePools: async ({ currencyA, currencyB }) => {
+          getCandidatePools: async (params: { currencyA?: Currency, currencyB?: Currency }) => {
             try {
-              logger.debug(`Fetching candidate pools for ${currencyA?.symbol} -> ${currencyB?.symbol}`)
+              logger.debug(`Fetching candidate pools for ${params.currencyA?.symbol} -> ${params.currencyB?.symbol}`)
               
               // Get V2 and V3 candidate pools
               const [v2Pools, v3Pools] = await Promise.all([
                 SmartRouter.getV2CandidatePools({
                   onChainProvider,
-                  currencyA,
-                  currencyB,
+                  currencyA: params.currencyA!,
+                  currencyB: params.currencyB!,
                   v2SubgraphProvider:  () => this.v2SubgraphClient as any,
                   v3SubgraphProvider: () => this.v3SubgraphClient as any,
                 }),
                 SmartRouter.getV3CandidatePools({
                   onChainProvider,
-                  currencyA,
-                  currencyB,
+                  currencyA: params.currencyA!,
+                  currencyB: params.currencyB!,
                   subgraphProvider: () => this.v3SubgraphClient as any,
                 }),
               ])
@@ -245,14 +245,14 @@ export class TokenQuoter {
     )
 
     // Get route path
-    const routePath = trade.routes.map(route => 
-      route.path.map(token => token.symbol || "Unknown").join(" → ")
+    const routePath = trade.routes.map((route: any) => 
+      route.path.map((token: any) => token.symbol || "Unknown").join(" → ")
     )
 
     // Get pool info
     const pools: string[] = []
-    trade.routes.forEach(route => {
-      route.pools.forEach(pool => {
+    trade.routes.forEach((route: any) => {
+      route.pools.forEach((pool: any) => {
         if ('address' in pool && pool.address) {
           pools.push(pool.address)
         } else {

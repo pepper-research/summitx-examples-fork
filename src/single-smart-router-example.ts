@@ -22,8 +22,8 @@ async function main() {
   logger.header("Example 1: T12ETH → USDC Quote with Smart Router")
   const shouldAdjustQuoteForGas = false // Set to true to adjust quote for gas costs
   const quote1 = await quoter.getQuote(
-    baseTestnetTokens.t12eth,
     baseTestnetTokens.usdc,
+    baseTestnetTokens.t12eth,
     "1001", // 100 USDC
     TradeType.EXACT_INPUT,
     shouldAdjustQuoteForGas

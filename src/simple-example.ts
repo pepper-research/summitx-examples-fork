@@ -1,6 +1,6 @@
 import { config } from "dotenv"
 import { TradeType } from "@summitx/swap-sdk-core"
-import { SimpleQuoter } from "./quoter/simple-quoter"
+import { TokenQuoter } from "./quoter/token-quoter"
 import { baseTestnetTokens } from "./config/base-testnet"
 import { logger } from "./utils/logger"
 
@@ -8,91 +8,82 @@ import { logger } from "./utils/logger"
 config()
 
 async function main() {
-  logger.header("SummitX Simple Token Quoter - Base Testnet Demo")
+  logger.header("SummitX Smart Router Token Quoter - Base Testnet Demo")
 
-  // Initialize simple quoter
-  const quoter = new SimpleQuoter(0.5) // 0.5% slippage
-
-  // Example 1: Simple swap quote (USDC → WETH)
-  logger.header("Example 1: USDC → WETH Quote")
-  const quote1 = await quoter.getQuote(
-    baseTestnetTokens.usdc,
-    baseTestnetTokens.weth,
-    "100", // 100 USDC
-    TradeType.EXACT_INPUT
-  )
-
-  if (quote1) {
-    logger.success("Quote Details:", {
-      input: `${quote1.inputAmount} ${quote1.inputToken.symbol}`,
-      output: `${quote1.outputAmount} ${quote1.outputToken.symbol}`,
-      minimumReceived: `${quote1.minimumReceived} ${quote1.outputToken.symbol}`,
-      priceImpact: quote1.priceImpact,
-      executionPrice: `1 ${quote1.inputToken.symbol} = ${quote1.executionPrice} ${quote1.outputToken.symbol}`,
-    })
-  }
-
-  logger.divider()
-
-  // Example 2: Reverse quote (WETH → USDC)
-  logger.header("Example 2: WETH → USDC Quote")
-  const quote2 = await quoter.getQuote(
-    baseTestnetTokens.weth,
-    baseTestnetTokens.usdc,
-    "0.1", // 0.1 WETH
-    TradeType.EXACT_INPUT
-  )
-
-  if (quote2) {
-    logger.success("Quote Details:", {
-      input: `${quote2.inputAmount} ${quote2.inputToken.symbol}`,
-      output: `${quote2.outputAmount} ${quote2.outputToken.symbol}`,
-      minimumReceived: `${quote2.minimumReceived} ${quote2.outputToken.symbol}`,
-      priceImpact: quote2.priceImpact,
-      executionPrice: `1 ${quote2.inputToken.symbol} = ${quote2.executionPrice} ${quote2.outputToken.symbol}`,
-    })
-  }
-
-  logger.divider()
-
-  // Example 3: Batch quotes
-  logger.header("Example 3: Multiple Quotes")
-  const batchQuotes = await quoter.getMultipleQuotes([
-    {
-      inputToken: baseTestnetTokens.usdc,
-      outputToken: baseTestnetTokens.summit,
-      amount: "50",
-    },
-    {
-      inputToken: baseTestnetTokens.weth,
-      outputToken: baseTestnetTokens.summit,
-      amount: "0.05",
-    },
-    {
-      inputToken: baseTestnetTokens.summit,
-      outputToken: baseTestnetTokens.t12eth,
-      amount: "500",
-    },
-  ])
-
-  batchQuotes.forEach((quote, index) => {
-    if (quote) {
-      logger.success(`Quote ${index + 1}:`, {
-        pair: `${quote.inputToken.symbol} → ${quote.outputToken.symbol}`,
-        input: `${quote.inputAmount} ${quote.inputToken.symbol}`,
-        output: `${quote.outputAmount} ${quote.outputToken.symbol}`,
-        priceImpact: quote.priceImpact,
-      })
-    } else {
-      logger.warn(`Quote ${index + 1}: No route found`)
-    }
+  // Initialize token quoter with smart router (same as UI)
+  const quoter = new TokenQuoter({
+    rpcUrl: "https://rpc-campnetwork.xyz/8708df38d9cc4bb39ac813ae005be495",
+    slippageTolerance: 0.5, // 0.5% slippage
+    maxHops: 3,
+    maxSplits: 3,
+    useStaticPools: false, // Use dynamic pool fetching like UI
+    useMockPools: false, // Use real pools
   })
 
-  logger.divider()
-  logger.success("All examples completed!")
+  // Test USDC to T12ETH quote (the problematic pair)
+  logger.info("Testing USDC → T12ETH quote...")
   
-  logger.divider()
-  logger.info("Note: This is a simplified demo. In production, quotes would come from actual liquidity pools via the smart-router.")
+  try {
+    const quote = await quoter.getQuote(
+      baseTestnetTokens.usdc,
+      baseTestnetTokens.t12eth,
+      "1000000", // 1 USDC (6 decimals)
+      TradeType.EXACT_INPUT,
+      true // shouldAdjustQuoteForGas
+    )
+
+    if (quote) {
+      logger.success("✅ USDC → T12ETH Quote Found!", {
+        inputAmount: quote.inputAmount,
+        outputAmount: quote.outputAmount,
+        priceImpact: quote.priceImpact,
+        route: quote.route,
+        pools: quote.pools,
+        gasEstimate: quote.gasEstimate,
+        executionPrice: quote.executionPrice,
+        minimumReceived: quote.minimumReceived,
+        routerTime: quote.routerTime,
+      })
+    } else {
+      logger.warn("❌ No route found for USDC → T12ETH")
+    }
+  } catch (error) {
+    logger.error("❌ Error getting USDC → T12ETH quote:", error)
+  }
+
+  // Test T12ETH to USDC quote (reverse direction)
+  logger.info("Testing T12ETH → USDC quote...")
+  
+  try {
+    const quote = await quoter.getQuote(
+      baseTestnetTokens.t12eth,
+      baseTestnetTokens.usdc,
+      "1000000000000", // 1 T12ETH (12 decimals)
+      TradeType.EXACT_INPUT,
+      true // shouldAdjustQuoteForGas
+    )
+
+    if (quote) {
+      logger.success("✅ T12ETH → USDC Quote Found!", {
+        inputAmount: quote.inputAmount,
+        outputAmount: quote.outputAmount,
+        priceImpact: quote.priceImpact,
+        route: quote.route,
+        pools: quote.pools,
+        gasEstimate: quote.gasEstimate,
+        executionPrice: quote.executionPrice,
+        minimumReceived: quote.minimumReceived,
+        routerTime: quote.routerTime,
+      })
+    } else {
+      logger.warn("❌ No route found for T12ETH → USDC")
+    }
+  } catch (error) {
+    logger.error("❌ Error getting T12ETH → USDC quote:", error)
+  }
+
+  logger.success("Smart router examples completed!")
+  logger.info("Note: This now uses the actual smart router like the UI. If no pools are available on Base testnet, the quotes may fail.")
 }
 
 // Run the examples
@@ -102,5 +93,6 @@ main().catch((error) => {
 })
 
 // Export for programmatic usage
-export { SimpleQuoter } from "./quoter/simple-quoter"
-export { baseTestnetTokens } from "./config/base-testnet"export { logger } from "./utils/logger"
+export { TokenQuoter } from "./quoter/token-quoter"
+export { baseTestnetTokens } from "./config/base-testnet"
+export { logger } from "./utils/logger"

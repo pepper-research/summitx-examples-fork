@@ -92,8 +92,8 @@ async function main() {
   })
 
   // Define swap parameters
-  const inputToken = baseCampTestnetTokens.usdc
-  const outputToken = baseCampTestnetTokens.t12eth
+  const inputToken = baseCampTestnetTokens.usdt
+  const outputToken = baseCampTestnetTokens.usdc
   const inputAmount = "10" // 10 USDC
   const slippageTolerancePercent = new Percent(100, 10000) // 1%
 

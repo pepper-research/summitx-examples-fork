@@ -57,6 +57,7 @@ export const WETH_ADDRESS = "0x1aE9c40eCd2DD6ad5858E5430A556d7aff28A44b"
 export const USDC_ADDRESS = "0x71002dbf6cC7A885cE6563682932370c056aAca9"
 export const SUMMIT_ADDRESS = "0x052a99849Ef2e13a5CB28275862991671D4b6fF5"
 export const MOCK_A_ADDRESS = "0x0bc3f0aF8A5Ef6EA02A256797099e442D95A8Ecc"
+export const USDT_ADDRESS = "0xA745f7A59E70205e6040BdD3b33eD21DBD23FEB3"
 
 // Token instances
 export const baseCampTestnetTokens = {
@@ -99,6 +100,14 @@ export const baseCampTestnetTokens = {
     "T12ETH",
     "T12 ETH",
     ""
+  ),
+  usdt: new Token(
+    BASECAMP_TESTNET,
+    USDT_ADDRESS,
+    6,
+    "USDT",
+    "Tether USD",
+    "https://tether.to"
   ),
 }
 

@@ -86,16 +86,16 @@ async function main() {
   // Initialize token quoter
   const quoter = new TokenQuoter({
     rpcUrl: "https://rpc-campnetwork.xyz/8708df38d9cc4bb39ac813ae005be495",
-    slippageTolerance: 1.0,
+    slippageTolerance: 5.0,
     maxHops: 3,
-    maxSplits: 3,
+    maxSplits: 4,
   })
 
   // Define swap parameters
-  const inputToken = baseCampTestnetTokens.usdt
+  const inputToken = baseCampTestnetTokens.t12eth
   const outputToken = baseCampTestnetTokens.usdc
-  const inputAmount = "10" // 10 USDC
-  const slippageTolerancePercent = new Percent(100, 10000) // 1%
+  const inputAmount = "150" // 10 USDC
+  const slippageTolerancePercent = new Percent(1000, 10000) // 1%
 
   logger.header("Step 1: Check Balances")
   
@@ -140,8 +140,11 @@ async function main() {
     // Convert to SmartRouterTrade format
     logger.header("Step 3: Convert to SmartRouterTrade")
     
-    const trade = QuoteToTradeConverterV2.convertQuoteToTrade(quote)
-    
+    if(!quote.rawTrade) {
+      console.log("No raw trade available, converting to SmartRouterTrade")
+      return
+    }
+    const trade = quote.rawTrade
     logger.success("Trade converted:", {
       inputAmount: `${formatUnits(trade.inputAmount.quotient, trade.inputAmount.currency.decimals)} ${trade.inputAmount.currency.symbol}`,
       outputAmount: `${formatUnits(trade.outputAmount.quotient, trade.outputAmount.currency.decimals)} ${trade.outputAmount.currency.symbol}`,

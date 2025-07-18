@@ -15,7 +15,14 @@ class Logger {
     
     if (data) {
       if (typeof data === "object") {
-        output += "\n" + JSON.stringify(data, null, 2)
+        // Handle BigInt serialization
+        const replacer = (key: string, value: any) => {
+          if (typeof value === 'bigint') {
+            return value.toString()
+          }
+          return value
+        }
+        output += "\n" + JSON.stringify(data, replacer, 2)
       } else {
         output += ` ${data}`
       }

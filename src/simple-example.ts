@@ -1,7 +1,7 @@
 import { config } from "dotenv"
 import { TradeType } from "@summitx/swap-sdk-core"
 import { TokenQuoter } from "./quoter/token-quoter"
-import { baseTestnetTokens } from "./config/base-testnet"
+import { baseCampTestnetTokens } from "./config/base-testnet"
 import { logger } from "./utils/logger"
 
 // Load environment variables
@@ -25,8 +25,8 @@ async function main() {
   
   try {
     const quote = await quoter.getQuote(
-      baseTestnetTokens.usdc,
-      baseTestnetTokens.t12eth,
+      baseCampTestnetTokens.usdc,
+      baseCampTestnetTokens.t12eth,
       "1000000", // 1 USDC (6 decimals)
       TradeType.EXACT_INPUT,
       true // shouldAdjustQuoteForGas
@@ -56,8 +56,8 @@ async function main() {
   
   try {
     const quote = await quoter.getQuote(
-      baseTestnetTokens.t12eth,
-      baseTestnetTokens.usdc,
+      baseCampTestnetTokens.t12eth,
+      baseCampTestnetTokens.usdc,
       "1000000000000", // 1 T12ETH (12 decimals)
       TradeType.EXACT_INPUT,
       true // shouldAdjustQuoteForGas
@@ -94,5 +94,5 @@ main().catch((error) => {
 
 // Export for programmatic usage
 export { TokenQuoter } from "./quoter/token-quoter"
-export { baseTestnetTokens } from "./config/base-testnet"
+export { baseCampTestnetTokens } from "./config/base-testnet"
 export { logger } from "./utils/logger"

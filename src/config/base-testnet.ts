@@ -59,7 +59,15 @@ export const SUMMIT_ADDRESS = "0x052a99849Ef2e13a5CB28275862991671D4b6fF5"
 export const MOCK_A_ADDRESS = "0x0bc3f0aF8A5Ef6EA02A256797099e442D95A8Ecc"
 
 // Token instances
-export const baseTestnetTokens = {
+export const baseCampTestnetTokens = {
+  wcamp: new Token(
+    BASECAMP_TESTNET,
+    WETH_ADDRESS, // WCAMP and WETH share the same address on Base Camp testnet
+    18,
+    "WCAMP",
+    "Wrapped CAMP",
+    ""
+  ),
   weth: new Token(
     BASECAMP_TESTNET,
     WETH_ADDRESS,
@@ -94,8 +102,11 @@ export const baseTestnetTokens = {
   ),
 }
 
+// Export alias for backward compatibility
+export const baseTestnetTokens = baseCampTestnetTokens
+
 // Base tokens for routing
-export const BASE_TOKENS = [baseTestnetTokens.usdc, baseTestnetTokens.weth]
+export const BASE_TOKENS = [baseCampTestnetTokens.usdc, baseCampTestnetTokens.weth]
 
 // Multicall configuration
 export const MULTICALL_CONFIG = {

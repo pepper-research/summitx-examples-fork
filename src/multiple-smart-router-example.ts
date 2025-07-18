@@ -1,7 +1,7 @@
 import { config } from "dotenv"
 import { TradeType } from "@summitx/swap-sdk-core"
 import { TokenQuoter } from "./quoter/token-quoter"
-import { baseTestnetTokens } from "./config/base-testnet"
+import { baseCampTestnetTokens } from "./config/base-testnet"
 import { logger } from "./utils/logger"
 
 // Load environment variables
@@ -22,8 +22,8 @@ async function main() {
   logger.header("Example 1: USDC → WETH Quote with Smart Router")
   const shouldAdjustQuoteForGas = false // Set to true to adjust quote for gas costs
   const quote1 = await quoter.getQuote(
-    baseTestnetTokens.usdc,
-    baseTestnetTokens.weth,
+    baseCampTestnetTokens.usdc,
+    baseCampTestnetTokens.weth,
     "100", // 100 USDC
     TradeType.EXACT_INPUT,
     shouldAdjustQuoteForGas
@@ -47,8 +47,8 @@ async function main() {
   // Example 2: Complex routing (SUMMIT → USDC)
   logger.header("Example 2: SUMMIT → USDC Quote (may route through WETH)")
   const quote2 = await quoter.getQuote(
-    baseTestnetTokens.summit,
-    baseTestnetTokens.usdc,
+    baseCampTestnetTokens.summit,
+    baseCampTestnetTokens.usdc,
     "1000", // 1000 SUMMIT
     TradeType.EXACT_INPUT,
     shouldAdjustQuoteForGas
@@ -71,26 +71,26 @@ async function main() {
   logger.header("Example 3: Multiple Smart Router Quotes")
   const pairs = [
     {
-      inputToken: baseTestnetTokens.usdc,
-      outputToken: baseTestnetTokens.summit,
+      inputToken: baseCampTestnetTokens.usdc,
+      outputToken: baseCampTestnetTokens.summit,
       amount: "50",
       shouldAdjustQuoteForGas: true,
     },
     {
-      inputToken: baseTestnetTokens.weth,
-      outputToken: baseTestnetTokens.summit,
+      inputToken: baseCampTestnetTokens.weth,
+      outputToken: baseCampTestnetTokens.summit,
       amount: "0.05",
       shouldAdjustQuoteForGas: false,
     },
     {
-      inputToken: baseTestnetTokens.summit,
-      outputToken: baseTestnetTokens.t12eth,
+      inputToken: baseCampTestnetTokens.summit,
+      outputToken: baseCampTestnetTokens.t12eth,
       amount: "500",
       shouldAdjustQuoteForGas: true,
     },
     {
-      inputToken: baseTestnetTokens.t12eth,
-      outputToken: baseTestnetTokens.usdc,
+      inputToken: baseCampTestnetTokens.t12eth,
+      outputToken: baseCampTestnetTokens.usdc,
       amount: "100",
       shouldAdjustQuoteForGas: false,
     },
@@ -127,4 +127,4 @@ main().catch((error) => {
 
 // Export for programmatic usage
 export { TokenQuoter } from "./quoter/token-quoter"
-export { baseTestnetTokens } from "./config/base-testnet"
+export { baseCampTestnetTokens } from "./config/base-testnet"

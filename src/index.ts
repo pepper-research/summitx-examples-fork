@@ -1,7 +1,7 @@
 import { config } from "dotenv"
 import { TradeType } from "@summitx/swap-sdk-core"
 import { TokenQuoter } from "./quoter/token-quoter"
-import { baseTestnetTokens } from "./config/base-testnet"
+import { baseCampTestnetTokens } from "./config/base-testnet"
 import { logger } from "./utils/logger"
 
 // Load environment variables
@@ -22,8 +22,8 @@ async function main() {
   // Example 1: Simple swap quote (USDC → WETH)
   logger.header("Example 1: USDC → WETH Quote")
   const quote1 = await quoter.getQuote(
-    baseTestnetTokens.usdc,
-    baseTestnetTokens.weth,
+    baseCampTestnetTokens.usdc,
+    baseCampTestnetTokens.weth,
     "100", // 100 USDC
     TradeType.EXACT_INPUT
   )
@@ -44,8 +44,8 @@ async function main() {
   // Example 2: Reverse quote (WETH → USDC)
   logger.header("Example 2: WETH → USDC Quote")
   const quote2 = await quoter.getQuote(
-    baseTestnetTokens.weth,
-    baseTestnetTokens.usdc,
+    baseCampTestnetTokens.weth,
+    baseCampTestnetTokens.usdc,
     "0.1", // 0.1 WETH
     TradeType.EXACT_INPUT
   )
@@ -66,8 +66,8 @@ async function main() {
   // Example 3: Multi-hop quote (SUMMIT → USDC, potentially through WETH)
   logger.header("Example 3: SUMMIT → USDC Quote (Multi-hop)")
   const quote3 = await quoter.getQuote(
-    baseTestnetTokens.summit,
-    baseTestnetTokens.usdc,
+    baseCampTestnetTokens.summit,
+    baseCampTestnetTokens.usdc,
     "1000", // 1000 SUMMIT
     TradeType.EXACT_INPUT
   )
@@ -90,18 +90,18 @@ async function main() {
   logger.header("Example 4: Multiple Quotes")
   const batchQuotes = await quoter.getMultipleQuotes([
     {
-      inputToken: baseTestnetTokens.usdc,
-      outputToken: baseTestnetTokens.summit,
+      inputToken: baseCampTestnetTokens.usdc,
+      outputToken: baseCampTestnetTokens.summit,
       amount: "50",
     },
     {
-      inputToken: baseTestnetTokens.weth,
-      outputToken: baseTestnetTokens.summit,
+      inputToken: baseCampTestnetTokens.weth,
+      outputToken: baseCampTestnetTokens.summit,
       amount: "0.05",
     },
     {
-      inputToken: baseTestnetTokens.t12eth,
-      outputToken: baseTestnetTokens.usdc,
+      inputToken: baseCampTestnetTokens.t12eth,
+      outputToken: baseCampTestnetTokens.usdc,
       amount: "500",
     },
   ])
@@ -124,8 +124,8 @@ async function main() {
   // Example 5: Exact output quote
   logger.header("Example 5: Exact Output Quote (Get exactly 100 USDC)")
   const quote5 = await quoter.getQuote(
-    baseTestnetTokens.weth,
-    baseTestnetTokens.usdc,
+    baseCampTestnetTokens.weth,
+    baseCampTestnetTokens.usdc,
     "100", // Want exactly 100 USDC output
     TradeType.EXACT_OUTPUT
   )
@@ -153,5 +153,5 @@ main().catch((error) => {
 
 // Export for programmatic usage
 export { TokenQuoter } from "./quoter/token-quoter"
-export { baseTestnetTokens } from "./config/base-testnet"
+export { baseCampTestnetTokens } from "./config/base-testnet"
 export { logger } from "./utils/logger"

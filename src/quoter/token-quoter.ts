@@ -42,6 +42,8 @@ export interface QuoteResult {
   executionPrice: string
   minimumReceived: string
   routerTime?: string
+  // Add the raw trade object for proper conversion
+  rawTrade?: SmartRouterTrade<TradeType>
 }
 
 export class TokenQuoter {
@@ -115,7 +117,7 @@ export class TokenQuoter {
 
       // Fetch candidate pools (same as UI's useCommonPoolsLite)
       const poolFetchStartTime = Date.now()
-      logger.debug(`Fetching candidate pools for ${inputToken.symbol} -> ${outputToken.symbol}`)
+      console.log(`Fetching candidate pools for ${inputToken.symbol} -> ${outputToken.symbol}`)
       
       const [v2Pools, v3Pools, stablePools] = await Promise.all([
         SmartRouter.getV2CandidatePools({
@@ -140,8 +142,10 @@ export class TokenQuoter {
 
       const candidatePools = [...v2Pools, ...v3Pools, ...stablePools]
       const poolFetchTime = Date.now() - poolFetchStartTime
-      logger.debug(`Found ${v2Pools.length} V2 pools, ${v3Pools.length} V3 pools, and ${stablePools.length} stable pools in ${poolFetchTime}ms`)
-
+      console.log(`Found ${v2Pools.length} V2 pools, ${v3Pools.length} V3 pools, and ${stablePools.length} stable pools in ${poolFetchTime}ms`)
+      console.log("Candidate pools v2: ", v2Pools.map((pool) => pool.reserve0.currency.symbol + " - " + pool.reserve1.currency.symbol))
+      console.log("Candidate pools v3: ", v3Pools.map((pool) => pool.token0.symbol + " - " + pool.token1.symbol))
+      console.log("Candidate pools stable: ", stablePools.map((pool) => pool.address))
       // Create static pool provider (same as UI)
       const poolProvider = SmartRouter.createStaticPoolProvider(candidatePools)
 
@@ -308,6 +312,7 @@ export class TokenQuoter {
       executionPrice,
       minimumReceived,
       routerTime: `${routerTime}ms`,
+      rawTrade: trade,
     }
   }
 }

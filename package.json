@@ -12,7 +12,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "clean": "rm -rf dist && rm -rf node_modules"
+    "clean": "rm -rf dist && rm -rf node_modules",
+    "dev:execute": "tsup && tsx src/execute-swap-interface-style.ts"
   },
   "dependencies": {
     "@summitx/chains": "0.1.0",

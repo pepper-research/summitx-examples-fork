@@ -1,7 +1,7 @@
 import { config } from "dotenv"
 import { TradeType } from "@summitx/swap-sdk-core"
 import { TokenQuoter } from "./quoter/token-quoter"
-import { baseTestnetTokens } from "./config/base-testnet"
+import { baseCampTestnetTokens } from "./config/base-testnet"
 import { logger } from "./utils/logger"
 
 // Load environment variables
@@ -21,14 +21,17 @@ async function main() {
   // Example 1: Get quote using smart router (USDC → WETH)
   logger.header("Example 1: T12ETH → USDC Quote with Smart Router")
   const shouldAdjustQuoteForGas = false // Set to true to adjust quote for gas costs
+
+  console.log(`Getting quote for ${baseCampTestnetTokens.usdc} → ${baseCampTestnetTokens.t12eth} ${shouldAdjustQuoteForGas ? "with gas adjustment" : "without gas adjustment"}`)
   const quote1 = await quoter.getQuote(
-    baseTestnetTokens.usdc,
-    baseTestnetTokens.t12eth,
+    baseCampTestnetTokens.usdc,
+    baseCampTestnetTokens.t12eth,
     "1001", // 100 USDC
     TradeType.EXACT_INPUT,
     shouldAdjustQuoteForGas
   )
 
+  console.log("Quote: ", quote1)
   if (quote1) {
     logger.success("Smart Router Quote Details:", {
       input: `${quote1.inputAmount} ${quote1.inputToken.symbol}`,
@@ -49,8 +52,8 @@ async function main() {
   logger.divider()
 
   // const pairs = [
-  //   { inputToken: baseTestnetTokens.usdc, outputToken: baseTestnetTokens.weth, amount: "100" },
-  //   { inputToken: baseTestnetTokens.summit, outputToken: baseTestnetTokens.usdc, amount: "1000" },
+  //   { inputToken: baseCampTestnetTokens.usdc, outputToken: baseCampTestnetTokens.weth, amount: "100" },
+  //   { inputToken: baseCampTestnetTokens.summit, outputToken: baseCampTestnetTokens.usdc, amount: "1000" },
   // ]
 
   // const batchQuotes = await quoter.getMultipleQuotes(pairs)
@@ -84,4 +87,4 @@ main().catch((error) => {
 
 // Export for programmatic usage
 export { TokenQuoter } from "./quoter/token-quoter"
-export { baseTestnetTokens } from "./config/base-testnet"
+export { baseCampTestnetTokens } from "./config/base-testnet"

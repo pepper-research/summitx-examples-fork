@@ -20,20 +20,20 @@ async function main() {
     useMockPools: false, // Use real pools
   })
 
-  // Test USDC to T12ETH quote (the problematic pair)
-  logger.info("Testing USDC → T12ETH quote...")
+  // Test USDC to WETH quote
+  logger.info("Testing USDC → WETH quote...")
   
   try {
     const quote = await quoter.getQuote(
       baseCampTestnetTokens.usdc,
-      baseCampTestnetTokens.t12eth,
+      baseCampTestnetTokens.weth,
       "1000000", // 1 USDC (6 decimals)
       TradeType.EXACT_INPUT,
       true // shouldAdjustQuoteForGas
     )
 
     if (quote) {
-      logger.success("✅ USDC → T12ETH Quote Found!", {
+      logger.success("✅ USDC → WETH Quote Found!", {
         inputAmount: quote.inputAmount,
         outputAmount: quote.outputAmount,
         priceImpact: quote.priceImpact,
@@ -45,26 +45,30 @@ async function main() {
         routerTime: quote.routerTime,
       })
     } else {
-      logger.warn("❌ No route found for USDC → T12ETH")
+      logger.warn("❌ No route found for USDC → WETH")
     }
-  } catch (error) {
-    logger.error("❌ Error getting USDC → T12ETH quote:", error)
+  } catch (error: any) {
+    if (error?.message?.includes("429")) {
+      logger.error("❌ Rate limited - try again later");
+    } else {
+      logger.error("❌ Error getting USDC → WETH quote:", error?.message || error);
+    }
   }
 
-  // Test T12ETH to USDC quote (reverse direction)
-  logger.info("Testing T12ETH → USDC quote...")
+  // Test WBTC to DAI quote
+  logger.info("Testing WBTC → DAI quote...")
   
   try {
     const quote = await quoter.getQuote(
-      baseCampTestnetTokens.t12eth,
-      baseCampTestnetTokens.usdc,
-      "1000000000000", // 1 T12ETH (12 decimals)
+      baseCampTestnetTokens.wbtc,
+      baseCampTestnetTokens.dai,
+      "1000000000000000000", // 1 WBTC (18 decimals)
       TradeType.EXACT_INPUT,
       true // shouldAdjustQuoteForGas
     )
 
     if (quote) {
-      logger.success("✅ T12ETH → USDC Quote Found!", {
+      logger.success("✅ WBTC → DAI Quote Found!", {
         inputAmount: quote.inputAmount,
         outputAmount: quote.outputAmount,
         priceImpact: quote.priceImpact,
@@ -76,10 +80,49 @@ async function main() {
         routerTime: quote.routerTime,
       })
     } else {
-      logger.warn("❌ No route found for T12ETH → USDC")
+      logger.warn("❌ No route found for WBTC → DAI")
     }
-  } catch (error) {
-    logger.error("❌ Error getting T12ETH → USDC quote:", error)
+  } catch (error: any) {
+    if (error?.message?.includes("429")) {
+      logger.error("❌ Rate limited - try again later");
+    } else {
+      logger.error("❌ Error getting WBTC → DAI quote:", error?.message || error);
+    }
+  }
+
+  // Test USDT to USDC quote (stablecoin pair)
+  logger.info("Testing USDT → USDC quote...")
+  
+  try {
+    const quote = await quoter.getQuote(
+      baseCampTestnetTokens.usdt,
+      baseCampTestnetTokens.usdc,
+      "1000000", // 1 USDT (6 decimals)
+      TradeType.EXACT_INPUT,
+      true // shouldAdjustQuoteForGas
+    )
+
+    if (quote) {
+      logger.success("✅ USDT → USDC Quote Found!", {
+        inputAmount: quote.inputAmount,
+        outputAmount: quote.outputAmount,
+        priceImpact: quote.priceImpact,
+        route: quote.route,
+        pools: quote.pools,
+        gasEstimate: quote.gasEstimate,
+        executionPrice: quote.executionPrice,
+        minimumReceived: quote.minimumReceived,
+        routerTime: quote.routerTime,
+      })
+    } else {
+      logger.warn("❌ No route found for USDT → USDC")
+    }
+  } catch (error: any) {
+    if (error?.message?.includes("429")) {
+      logger.error("❌ Rate limited - try again later");
+    } else {
+      logger.error("❌ Error getting USDT → USDC quote:", error?.message || error);
+    }
   }
 
   logger.success("Smart router examples completed!")
@@ -87,9 +130,13 @@ async function main() {
 }
 
 // Run the examples
-main().catch((error) => {
-  logger.error("Failed to run examples", error)
-  process.exit(1)
+main().catch((error: any) => {
+  if (error?.message?.includes("429")) {
+    logger.error("⚠️ Rate limited - try again later");
+  } else {
+    logger.error("Failed to run examples:", error?.message || error);
+  }
+  process.exit(1);
 })
 
 // Export for programmatic usage

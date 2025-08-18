@@ -1,157 +1,76 @@
-import { config } from "dotenv"
-import { TradeType } from "@summitx/swap-sdk-core"
-import { TokenQuoter } from "./quoter/token-quoter"
-import { baseCampTestnetTokens } from "./config/base-testnet"
-import { logger } from "./utils/logger"
+import { exec } from "child_process";
+import { config } from "dotenv";
+import { promisify } from "util";
+import { logger } from "./utils/logger";
 
-// Load environment variables
-config()
+config();
 
-async function main() {
-  logger.header("SummitX Token Quoter - Base Testnet")
+const execAsync = promisify(exec);
 
-  // Initialize quoter with options
-  const quoter = new TokenQuoter({
-    rpcUrl: process.env.BASE_TESTNET_RPC_URL,
-    maxHops: 3,
-    maxSplits: 3,
-    distributionPercent: 5,
-    slippageTolerance: 0.5, // 0.5%
-  })
-
-  // Example 1: Simple swap quote (USDC → WETH)
-  logger.header("Example 1: USDC → WETH Quote")
-  const quote1 = await quoter.getQuote(
-    baseCampTestnetTokens.usdc,
-    baseCampTestnetTokens.weth,
-    "100", // 100 USDC
-    TradeType.EXACT_INPUT
-  )
-
-  if (quote1) {
-    logger.success("Quote Details:", {
-      input: `${quote1.inputAmount} ${quote1.inputToken.symbol}`,
-      output: `${quote1.outputAmount} ${quote1.outputToken.symbol}`,
-      minimumReceived: `${quote1.minimumReceived} ${quote1.outputToken.symbol}`,
-      priceImpact: quote1.priceImpact,
-      executionPrice: `1 ${quote1.inputToken.symbol} = ${quote1.executionPrice} ${quote1.outputToken.symbol}`,
-      route: quote1.route,
-    })
+async function runCommand(command: string, description: string) {
+  logger.info(`Running: ${description}`);
+  try {
+    const { stdout, stderr } = await execAsync(command);
+    if (stdout) console.log(stdout);
+    if (stderr && !stderr.includes("DeprecationWarning")) console.error(stderr);
+    return true;
+  } catch (error: any) {
+    logger.error(`Failed: ${error?.message}`);
+    return false;
   }
-
-  logger.divider()
-
-  // Example 2: Reverse quote (WETH → USDC)
-  logger.header("Example 2: WETH → USDC Quote")
-  const quote2 = await quoter.getQuote(
-    baseCampTestnetTokens.weth,
-    baseCampTestnetTokens.usdc,
-    "0.1", // 0.1 WETH
-    TradeType.EXACT_INPUT
-  )
-
-  if (quote2) {
-    logger.success("Quote Details:", {
-      input: `${quote2.inputAmount} ${quote2.inputToken.symbol}`,
-      output: `${quote2.outputAmount} ${quote2.outputToken.symbol}`,
-      minimumReceived: `${quote2.minimumReceived} ${quote2.outputToken.symbol}`,
-      priceImpact: quote2.priceImpact,
-      executionPrice: `1 ${quote2.inputToken.symbol} = ${quote2.executionPrice} ${quote2.outputToken.symbol}`,
-      route: quote2.route,
-    })
-  }
-
-  logger.divider()
-
-  // Example 3: Multi-hop quote (SUMMIT → USDC, potentially through WETH)
-  logger.header("Example 3: SUMMIT → USDC Quote (Multi-hop)")
-  const quote3 = await quoter.getQuote(
-    baseCampTestnetTokens.summit,
-    baseCampTestnetTokens.usdc,
-    "1000", // 1000 SUMMIT
-    TradeType.EXACT_INPUT
-  )
-
-  if (quote3) {
-    logger.success("Quote Details:", {
-      input: `${quote3.inputAmount} ${quote3.inputToken.symbol}`,
-      output: `${quote3.outputAmount} ${quote3.outputToken.symbol}`,
-      minimumReceived: `${quote3.minimumReceived} ${quote3.outputToken.symbol}`,
-      priceImpact: quote3.priceImpact,
-      executionPrice: `1 ${quote3.inputToken.symbol} = ${quote3.executionPrice} ${quote3.outputToken.symbol}`,
-      route: quote3.route,
-      pools: quote3.pools,
-    })
-  }
-
-  logger.divider()
-
-  // Example 4: Batch quotes
-  logger.header("Example 4: Multiple Quotes")
-  const batchQuotes = await quoter.getMultipleQuotes([
-    {
-      inputToken: baseCampTestnetTokens.usdc,
-      outputToken: baseCampTestnetTokens.summit,
-      amount: "50",
-    },
-    {
-      inputToken: baseCampTestnetTokens.weth,
-      outputToken: baseCampTestnetTokens.summit,
-      amount: "0.05",
-    },
-    {
-      inputToken: baseCampTestnetTokens.t12eth,
-      outputToken: baseCampTestnetTokens.usdc,
-      amount: "500",
-    },
-  ])
-
-  batchQuotes.forEach((quote, index) => {
-    if (quote) {
-      logger.success(`Quote ${index + 1}:`, {
-        pair: `${quote.inputToken.symbol} → ${quote.outputToken.symbol}`,
-        input: `${quote.inputAmount} ${quote.inputToken.symbol}`,
-        output: `${quote.outputAmount} ${quote.outputToken.symbol}`,
-        priceImpact: quote.priceImpact,
-      })
-    } else {
-      logger.warn(`Quote ${index + 1}: No route found`)
-    }
-  })
-
-  logger.divider()
-
-  // Example 5: Exact output quote
-  logger.header("Example 5: Exact Output Quote (Get exactly 100 USDC)")
-  const quote5 = await quoter.getQuote(
-    baseCampTestnetTokens.weth,
-    baseCampTestnetTokens.usdc,
-    "100", // Want exactly 100 USDC output
-    TradeType.EXACT_OUTPUT
-  )
-
-  if (quote5) {
-    logger.success("Quote Details:", {
-      inputRequired: `${quote5.inputAmount} ${quote5.inputToken.symbol}`,
-      outputExact: `${quote5.outputAmount} ${quote5.outputToken.symbol}`,
-      maximumSent: `${quote5.inputAmount} ${quote5.inputToken.symbol}`,
-      priceImpact: quote5.priceImpact,
-      executionPrice: `1 ${quote5.inputToken.symbol} = ${quote5.executionPrice} ${quote5.outputToken.symbol}`,
-      route: quote5.route,
-    })
-  }
-
-  logger.divider()
-  logger.success("All examples completed!")
 }
 
-// Run the examples
-main().catch((error) => {
-  logger.error("Failed to run examples", error)
-  process.exit(1)
-})
+async function main() {
+  logger.header("🚀 SummitX DEX - Complete Examples");
+  logger.info("Base Camp Testnet (Chain ID: 123420001114)");
+  logger.divider();
 
-// Export for programmatic usage
-export { TokenQuoter } from "./quoter/token-quoter"
-export { baseCampTestnetTokens } from "./config/base-testnet"
-export { logger } from "./utils/logger"
+  if (!process.env.PRIVATE_KEY) {
+    logger.error("Please set PRIVATE_KEY in .env file");
+    process.exit(1);
+  }
+
+  // Run wrap/unwrap example
+  logger.header("💱 Running Wrap/Unwrap Example");
+  const wrapSuccess = await runCommand(
+    "npx tsx src/wrap-unwrap-example.ts",
+    "Wrap/Unwrap CAMP ↔ WCAMP"
+  );
+
+  if (!wrapSuccess) {
+    logger.warn("Wrap/unwrap example failed, continuing...");
+  }
+
+  // Wait longer between operations to avoid rate limiting
+  logger.info("⏳ Waiting 5 seconds before next operation...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // Run swap examples
+  logger.header("🔄 Running Swap Examples");
+  const swapSuccess = await runCommand(
+    "npx tsx src/swap-examples.ts",
+    "All Swap Examples"
+  );
+
+  if (!swapSuccess) {
+    logger.warn("Single swap example failed, continuing...");
+  }
+
+  // Wait longer between operations
+  logger.info("⏳ Waiting 5 seconds to complete...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  logger.divider();
+  logger.success("🎉 All examples completed!");
+  logger.info("\nAvailable commands:");
+  logger.info("  npm start          - Run this combined example");
+  logger.info("  npm run wrap-unwrap - Run wrap/unwrap example only");
+  logger.info("  npm run swap       - Run comprehensive swap examples");
+  logger.info("  npm run check:balance - Check wallet balances");
+}
+
+// Run the main function
+main().catch((error) => {
+  logger.error("Fatal error:", error?.message || error);
+  process.exit(1);
+});

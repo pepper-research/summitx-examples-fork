@@ -1,19 +1,49 @@
 import { config } from "dotenv";
-import { ethers } from "ethers";
-import { formatUnits, parseUnits } from "viem";
-import { WETH_ADDRESS } from "./config/base-testnet";
+import {
+  createPublicClient,
+  createWalletClient,
+  formatUnits,
+  http,
+  parseUnits,
+  type Address,
+  type Hex,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { WCAMP_ADDRESS, basecampTestnet } from "./config/base-testnet";
 import { logger } from "./utils/logger";
 
 config();
 
 const WETH_ABI = [
-  "function deposit() payable",
-  "function withdraw(uint256 amount)",
-  "function balanceOf(address account) view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "event Deposit(address indexed dst, uint256 wad)",
-  "event Withdrawal(address indexed src, uint256 wad)",
-];
+  {
+    name: "deposit",
+    type: "function",
+    inputs: [],
+    outputs: [],
+    stateMutability: "payable",
+  },
+  {
+    name: "withdraw",
+    type: "function",
+    inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    name: "balanceOf",
+    type: "function",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    name: "totalSupply",
+    type: "function",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
 
 async function main() {
   logger.header("Wrap/Unwrap Example - Base Camp Testnet");
@@ -23,15 +53,36 @@ async function main() {
     process.exit(1);
   }
 
-  const provider = new ethers.JsonRpcProvider(process.env.BASE_TESTNET_RPC_URL);
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-  const wethContract = new ethers.Contract(WETH_ADDRESS, WETH_ABI, wallet);
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
-  logger.info(`Wallet address: ${wallet.address}`);
+  const publicClient = createPublicClient({
+    chain: basecampTestnet,
+    transport: http(
+      process.env.BASE_TESTNET_RPC_URL || "https://rpc-campnetwork.xyz"
+    ),
+  });
+
+  const walletClient = createWalletClient({
+    account,
+    chain: basecampTestnet,
+    transport: http(
+      process.env.BASE_TESTNET_RPC_URL || "https://rpc-campnetwork.xyz"
+    ),
+  });
+
+  logger.info(`Wallet address: ${account.address}`);
 
   try {
-    const nativeBalance = await provider.getBalance(wallet.address);
-    const wethBalance = await wethContract.balanceOf(wallet.address);
+    const nativeBalance = await publicClient.getBalance({
+      address: account.address,
+    });
+
+    const wethBalance = await publicClient.readContract({
+      address: WCAMP_ADDRESS as Address,
+      abi: WETH_ABI,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
 
     logger.info("Current balances:", {
       nativeCAMP: formatUnits(nativeBalance, 18),
@@ -43,15 +94,30 @@ async function main() {
     const wrapAmount = parseUnits("0.01", 18);
     logger.info(`Wrapping ${formatUnits(wrapAmount, 18)} CAMP...`);
 
-    const wrapTx = await wethContract.deposit({ value: wrapAmount });
-    logger.info(`Wrap transaction sent: ${wrapTx.hash}`);
+    const wrapHash = await walletClient.writeContract({
+      address: WCAMP_ADDRESS as Address,
+      abi: WETH_ABI,
+      functionName: "deposit",
+      value: wrapAmount,
+    });
 
-    const wrapReceipt = await wrapTx.wait();
+    logger.info(`Wrap transaction sent: ${wrapHash}`);
+
+    const wrapReceipt = await publicClient.waitForTransactionReceipt({
+      hash: wrapHash,
+    });
+
     logger.success(
       `✅ Wrap successful! Gas used: ${wrapReceipt.gasUsed.toString()}`
     );
 
-    const newWethBalance = await wethContract.balanceOf(wallet.address);
+    const newWethBalance = await publicClient.readContract({
+      address: WCAMP_ADDRESS as Address,
+      abi: WETH_ABI,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
+
     logger.info(`New WCAMP balance: ${formatUnits(newWethBalance, 18)}`);
 
     logger.header("2. Unwrapping WCAMP to Native CAMP");
@@ -61,16 +127,33 @@ async function main() {
     if (newWethBalance >= unwrapAmount) {
       logger.info(`Unwrapping ${formatUnits(unwrapAmount, 18)} WCAMP...`);
 
-      const unwrapTx = await wethContract.withdraw(unwrapAmount);
-      logger.info(`Unwrap transaction sent: ${unwrapTx.hash}`);
+      const unwrapHash = await walletClient.writeContract({
+        address: WCAMP_ADDRESS as Address,
+        abi: WETH_ABI,
+        functionName: "withdraw",
+        args: [unwrapAmount],
+      });
 
-      const unwrapReceipt = await unwrapTx.wait();
+      logger.info(`Unwrap transaction sent: ${unwrapHash}`);
+
+      const unwrapReceipt = await publicClient.waitForTransactionReceipt({
+        hash: unwrapHash,
+      });
+
       logger.success(
         `✅ Unwrap successful! Gas used: ${unwrapReceipt.gasUsed.toString()}`
       );
 
-      const finalNativeBalance = await provider.getBalance(wallet.address);
-      const finalWethBalance = await wethContract.balanceOf(wallet.address);
+      const finalNativeBalance = await publicClient.getBalance({
+        address: account.address,
+      });
+
+      const finalWethBalance = await publicClient.readContract({
+        address: WCAMP_ADDRESS as Address,
+        abi: WETH_ABI,
+        functionName: "balanceOf",
+        args: [account.address],
+      });
 
       logger.success("Final balances:", {
         nativeCAMP: formatUnits(finalNativeBalance, 18),
@@ -80,14 +163,73 @@ async function main() {
       logger.warn("Insufficient WCAMP balance for unwrapping");
     }
 
+    logger.header("3. Advanced: Batch Wrap Operations");
+
+    const batchWrapAmounts = [
+      parseUnits("0.001", 18),
+      parseUnits("0.002", 18),
+      parseUnits("0.003", 18),
+    ];
+
+    logger.info("Executing batch wrap operations...");
+
+    for (let i = 0; i < batchWrapAmounts.length; i++) {
+      const amount = batchWrapAmounts[i];
+      logger.info(`Batch wrap ${i + 1}: ${formatUnits(amount, 18)} CAMP`);
+
+      const hash = await walletClient.writeContract({
+        address: WCAMP_ADDRESS as Address,
+        abi: WETH_ABI,
+        functionName: "deposit",
+        value: amount,
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      logger.success(`✅ Batch wrap ${i + 1} completed`);
+    }
+
+    const finalBatchWethBalance = await publicClient.readContract({
+      address: WCAMP_ADDRESS as Address,
+      abi: WETH_ABI,
+      functionName: "balanceOf",
+      args: [account.address],
+    });
+
+    logger.success(
+      `Total WCAMP after batch: ${formatUnits(finalBatchWethBalance, 18)}`
+    );
+
+    logger.header("4. Reading WETH Contract State");
+
+    const totalSupply = await publicClient.readContract({
+      address: WCAMP_ADDRESS as Address,
+      abi: WETH_ABI,
+      functionName: "totalSupply",
+    });
+
+    logger.info("WCAMP Total Supply:", formatUnits(totalSupply, 18));
+
     logger.success("🎉 Wrap/Unwrap example completed successfully!");
-  } catch (error) {
-    logger.error("Error during wrap/unwrap operations:", error);
+  } catch (error: any) {
+    // Handle rate limiting errors with cleaner output
+    if (error?.message?.includes("429") || error?.message?.includes("Too Many Requests")) {
+      logger.error("⚠️ Rate Limited: Too many requests to RPC endpoint");
+      logger.info("💡 Try again in a few seconds");
+    } else if (error?.shortMessage) {
+      logger.error("Error:", error.shortMessage);
+    } else {
+      logger.error("Error:", error?.message || "Unknown error occurred");
+    }
     process.exit(1);
   }
 }
 
-main().catch((error) => {
-  logger.error("Failed to run wrap/unwrap example", error);
+main().catch((error: any) => {
+  if (error?.message?.includes("429")) {
+    logger.error("⚠️ Rate limited - try again later");
+  } else {
+    logger.error("Failed to run wrap/unwrap example:", error?.message || error);
+  }
   process.exit(1);
 });

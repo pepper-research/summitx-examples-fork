@@ -4,19 +4,13 @@ import {
   type TradeConfig,
   PoolType,
   type OnChainProvider,
-  type PoolProvider,
 } from "@summitx/smart-router/evm"
 import { TradeType, CurrencyAmount, Currency, Percent } from "@summitx/swap-sdk-core"
 import type { PublicClient } from "viem"
-import { parseUnits, formatUnits } from "viem"
+import { createPublicClient, http, parseUnits, formatUnits } from "viem"
 import { ChainId } from "@summitx/chains"
-
 import { GraphQLClient } from 'graphql-request'
-
-import { 
-  createBaseTestnetClient,
-  createAllRpcClients,
-} from "../config/base-testnet"
+import { basecampTestnet } from "../config/base-testnet"
 import { logger } from "../utils/logger"
 
 export interface TokenQuoterOptions {
@@ -25,8 +19,9 @@ export interface TokenQuoterOptions {
   maxSplits?: number
   distributionPercent?: number
   slippageTolerance?: number // percentage (e.g., 0.5 for 0.5%)
-  useStaticPools?: boolean // Use static pool provider instead of dynamic fetching
-  useMockPools?: boolean // Use mock pools for testing
+  enableV2?: boolean // Enable V2 pools
+  enableV3?: boolean // Enable V3 pools
+  chainId?: ChainId
 }
 
 export interface QuoteResult {
@@ -42,36 +37,47 @@ export interface QuoteResult {
   executionPrice: string
   minimumReceived: string
   routerTime?: string
-  // Add the raw trade object for proper conversion
-  rawTrade?: SmartRouterTrade<TradeType>
+  trade?: SmartRouterTrade<TradeType> // The original trade object
+  rawTrade?: SmartRouterTrade<TradeType> // Alias for compatibility
 }
 
+// V3 and V2 subgraph URLs for Base Camp testnet
+const V3_SUBGRAPH_URL = 'https://api.goldsky.com/api/public/project_cllrma24857iy38x0a3oq836e/subgraphs/summitx-exchange-v3-users/1.0.1/gn'
+const V2_SUBGRAPH_URL = 'https://api.goldsky.com/api/public/project_cllrma24857iy38x0a3oq836e/subgraphs/summitx-exchange-v2/1.0.0/gn'
+
 export class TokenQuoter {
+  private chainId: ChainId
   private client: PublicClient
   private clients: PublicClient[]
-  private options: Required<TokenQuoterOptions>
+  private options: Required<Omit<TokenQuoterOptions, 'chainId'>>
   private v3SubgraphClient: GraphQLClient
   private v2SubgraphClient: GraphQLClient
 
   constructor(options: TokenQuoterOptions = {}) {
+    this.chainId = options.chainId || ChainId.BASECAMP_TESTNET
+    
     this.options = {
-      rpcUrl: options.rpcUrl || "",
+      rpcUrl: options.rpcUrl || "https://rpc-campnetwork.xyz",
       maxHops: options.maxHops ?? 3,
       maxSplits: options.maxSplits ?? 3,
-      distributionPercent: options.distributionPercent ?? 5,
+      distributionPercent: options.distributionPercent ?? 10,
       slippageTolerance: options.slippageTolerance ?? 0.5,
-      useStaticPools: options.useStaticPools ?? false,
-      useMockPools: options.useMockPools ?? false,
+      enableV2: options.enableV2 ?? true,
+      enableV3: options.enableV3 ?? true,
     }
 
-    this.client = createBaseTestnetClient(this.options.rpcUrl || undefined)
-    this.clients = this.options.rpcUrl ? [this.client] : createAllRpcClients()
-    this.v3SubgraphClient = new GraphQLClient(
-      'https://api.goldsky.com/api/public/project_cllrma24857iy38x0a3oq836e/subgraphs/summitx-exchange-v3-users/1.0.1/gn', 
-    )
-    this.v2SubgraphClient = new GraphQLClient(
-      'https://api.goldsky.com/api/public/project_cllrma24857iy38x0a3oq836e/subgraphs/summitx-exchange-v2/1.0.0/gn',
-    )
+    this.client = createPublicClient({
+      chain: basecampTestnet,
+      transport: http(this.options.rpcUrl),
+      batch: {
+        multicall: true,
+      },
+    }) as PublicClient
+
+    this.clients = [this.client]
+
+    this.v3SubgraphClient = new GraphQLClient(V3_SUBGRAPH_URL)
+    this.v2SubgraphClient = new GraphQLClient(V2_SUBGRAPH_URL)
   }
 
   async getQuote(
@@ -79,77 +85,119 @@ export class TokenQuoter {
     outputToken: Currency,
     inputAmountRaw: string,
     tradeType: TradeType = TradeType.EXACT_INPUT,
-    shouldAdjustQuoteForGas?: boolean | true
+    shouldAdjustQuoteForGas: boolean = false
   ): Promise<QuoteResult | null> {
     const startTime = Date.now()
     let routerStartTime: number
-    
+
     try {
-      logger.info("Getting quote... with shouldAdjustQuoteForGas", {
+      logger.info("Getting quote...", {
         inputToken: inputToken.symbol,
         outputToken: outputToken.symbol,
         amount: inputAmountRaw,
-        tradeType: tradeType === TradeType.EXACT_INPUT ? "EXACT_INPUT" : "EXACT_OUTPUT",
+        tradeType: TradeType[tradeType],
         shouldAdjustQuoteForGas
       })
 
-      // Parse input amount
+      // Parse input amount - expects decimal string like "0.1" or "100"
       const inputAmount = CurrencyAmount.fromRawAmount(
         inputToken,
         parseUnits(inputAmountRaw, inputToken.decimals).toString()
       )
 
-      // Create on-chain provider (same as UI)
-      const onChainProvider: OnChainProvider = ({ chainId }: { chainId?: ChainId }) => {
-        const client = this.clients[0]
-        return client as any
+      // Create on-chain provider
+      const onChainProvider: OnChainProvider = () => {
+        return this.client as any
       }
 
-      // TODO
-      
-
-      // Create quote provider (same as UI's useQuoteProvider)
-      const gasLimit = BigInt(100000000) // Use default gas limit like UI
+      // Create quote provider
+      const gasLimit = BigInt(100000000) // Use default gas limit
       const quoteProvider = SmartRouter.createQuoteProvider({
         onChainProvider,
         gasLimit,
       })
 
-      // Fetch candidate pools (same as UI's useCommonPoolsLite)
-      const poolFetchStartTime = Date.now()
-      console.log(`Fetching candidate pools for ${inputToken.symbol} -> ${outputToken.symbol}`)
+      // Fetch candidate pools
+      logger.info(`Fetching candidate pools for ${inputToken.symbol} -> ${outputToken.symbol}`)
       
-      const [v2Pools, v3Pools, stablePools] = await Promise.all([
-        SmartRouter.getV2CandidatePools({
-          onChainProvider,
-          currencyA: inputToken,
-          currencyB: outputToken,
-          v2SubgraphProvider: () => this.v2SubgraphClient as any,
-          v3SubgraphProvider: () => this.v3SubgraphClient as any,
-        }),
-        SmartRouter.getV3CandidatePools({
-          onChainProvider,
-          currencyA: inputToken,
-          currencyB: outputToken,
-          subgraphProvider: () => this.v3SubgraphClient as any,
-        }),
+      const poolPromises: Promise<any[]>[] = []
+
+      if (!this.options.enableV2 && !this.options.enableV3) {
+        logger.warn("Both V2 and V3 are disabled. No pools will be fetched.")
+        return null
+      }
+
+      if (this.options.enableV2) {
+        poolPromises.push(
+          SmartRouter.getV2CandidatePools({
+            onChainProvider,
+            currencyA: inputToken,
+            currencyB: outputToken,
+            v2SubgraphProvider: () => this.v2SubgraphClient as any,
+            v3SubgraphProvider: () => this.v3SubgraphClient as any,
+          })
+        )
+      }
+
+      if (this.options.enableV3) {
+        poolPromises.push(
+          SmartRouter.getV3CandidatePools({
+            onChainProvider,
+            currencyA: inputToken,
+            currencyB: outputToken,
+            subgraphProvider: () => this.v3SubgraphClient as any,
+          })
+        )
+      }
+
+      // Always include stable pools
+      poolPromises.push(
         SmartRouter.getStableCandidatePools({
           onChainProvider,
           currencyA: inputToken,
           currencyB: outputToken,
-        }),
-      ])
+        })
+      )
 
-      const candidatePools = [...v2Pools, ...v3Pools, ...stablePools]
-      const poolFetchTime = Date.now() - poolFetchStartTime
-      console.log(`Found ${v2Pools.length} V2 pools, ${v3Pools.length} V3 pools, and ${stablePools.length} stable pools in ${poolFetchTime}ms`)
-      console.log("Candidate pools v2: ", v2Pools.map((pool) => pool.reserve0.currency.symbol + " - " + pool.reserve1.currency.symbol))
-      console.log("Candidate pools v3: ", v3Pools.map((pool) => pool.token0.symbol + " - " + pool.token1.symbol))
-      console.log("Candidate pools stable: ", stablePools.map((pool) => pool.address))
-      // Create static pool provider (same as UI)
+      const poolResults = await Promise.all(poolPromises)
+      const candidatePools = poolResults.flat()
+
+      const v2Pools = candidatePools.filter(p => p.type === 'v2-pool').length
+      const v3Pools = candidatePools.filter(p => p.type === 'v3-pool').length
+      const stablePools = candidatePools.filter(p => p.type === 'stable-pool').length
+
+      logger.info(`Found ${v2Pools} V2 pools, ${v3Pools} V3 pools, and ${stablePools} stable pools in ${Date.now() - startTime}ms`)
+
+      if (candidatePools.length === 0) {
+        logger.warn("No pools found for this pair")
+        return null
+      }
+
+      // Log candidate pools for debugging
+      if (v2Pools > 0) {
+        logger.info("Candidate pools v2: ", candidatePools
+          .filter(p => p.type === 'v2-pool')
+          .map(p => `${p.reserve0.currency.symbol} - ${p.reserve1.currency.symbol}`)
+        )
+      }
+
+      if (v3Pools > 0) {
+        logger.info("Candidate pools v3: ", candidatePools
+          .filter(p => p.type === 'v3-pool')
+          .map(p => `${p.token0.symbol} - ${p.token1.symbol} (${p.fee / 10000}%)`)
+        )
+      }
+
+      // Create static pool provider
       const poolProvider = SmartRouter.createStaticPoolProvider(candidatePools)
 
-      // Define trade config (same as UI)
+      // Define allowed pool types based on preferences
+      const allowedPoolTypes: PoolType[] = []
+      if (this.options.enableV2) allowedPoolTypes.push(PoolType.V2)
+      if (this.options.enableV3) allowedPoolTypes.push(PoolType.V3)
+      allowedPoolTypes.push(PoolType.STABLE) // Always include stable
+
+      // Define trade config
       const tradeConfig: TradeConfig = {
         gasPriceWei: async () => BigInt(1000000000), // 1 gwei default
         poolProvider,
@@ -157,17 +205,23 @@ export class TokenQuoter {
         maxHops: this.options.maxHops,
         maxSplits: this.options.maxSplits,
         distributionPercent: this.options.distributionPercent,
-        allowedPoolTypes: [PoolType.V2, PoolType.V3, PoolType.STABLE],
-        quoterOptimization: false, // Same as UI
+        allowedPoolTypes: allowedPoolTypes.length > 0 ? allowedPoolTypes : [PoolType.V2, PoolType.V3, PoolType.STABLE],
+        quoterOptimization: false, // Disable optimization to reduce calls
       }
 
-      // Get best trade (same as UI)
+      // Get best trade
       routerStartTime = Date.now()
-      const trade = await SmartRouter.getBestTrade(inputAmount, outputToken, tradeType, tradeConfig)
+      const trade = await SmartRouter.getBestTrade(
+        inputAmount, 
+        outputToken, 
+        tradeType, 
+        tradeConfig,
+        shouldAdjustQuoteForGas
+      )
       const routerTime = Date.now() - routerStartTime
 
       if (!trade) {
-        logger.warn("No trade found")
+        logger.warn("No trade route found")
         return null
       }
 
@@ -175,18 +229,13 @@ export class TokenQuoter {
       const slippagePercent = new Percent(Math.floor(this.options.slippageTolerance * 100), 10000)
 
       // Format result
-      const result = this.formatQuoteResult(trade, inputAmountRaw, slippagePercent, routerTime)
+      const result = await this.formatQuoteResult(trade, inputAmountRaw, slippagePercent, routerTime)
       
       const totalTime = Date.now() - startTime
       logger.info(`Quote completed in ${totalTime}ms (router: ${routerTime}ms)`, {
-        inputToken: inputToken.symbol,
-        outputToken: outputToken.symbol,
-        inputAmount: inputAmountRaw,
         outputAmount: result.outputAmount,
         priceImpact: result.priceImpact,
-        route: result.route.join(" → "),
-        routerTime: `${routerTime}ms`,
-        totalTime: `${totalTime}ms`
+        route: result.route,
       })
 
       return result
@@ -219,7 +268,7 @@ export class TokenQuoter {
             pair.outputToken,
             pair.amount,
             TradeType.EXACT_INPUT,
-            pair.shouldAdjustQuoteForGas
+            pair.shouldAdjustQuoteForGas || false
           )
         } catch (error) {
           logger.error(`Failed to get quote for ${pair.inputToken.symbol} -> ${pair.outputToken.symbol}`, error)
@@ -231,50 +280,72 @@ export class TokenQuoter {
     return results
   }
 
-  private formatQuoteResult(
+  private async formatQuoteResult(
     trade: SmartRouterTrade<TradeType>,
-    inputAmountRaw: string,
+    inputAmountRaw: string, // This is already in smallest units
     slippagePercent: Percent,
     routerTime: number
-  ): QuoteResult {
-    const outputAmountWithSlippage = trade.outputAmount.multiply(
-      new Percent(1).subtract(slippagePercent)
-    )
+  ): Promise<QuoteResult> {
+    const outputAmountWithSlippage = trade.outputAmount.multiply(new Percent(1).subtract(slippagePercent))
 
-    // Calculate price impact manually
-    const priceImpact = trade.inputAmount.divide(trade.outputAmount).toFixed(2)
-    const executionPrice = trade.outputAmount.divide(trade.inputAmount).toFixed(6)
-    const minimumReceived = formatUnits(
-      outputAmountWithSlippage.quotient,
-      trade.outputAmount.currency.decimals
-    )
-
-    // Extract route information
-    const route = trade.routes.map(route => {
-      return route.path.map(token => token.symbol).join(' -> ')
-    })
+    // Calculate price impact
+    let priceImpact: string
     
+    const calculateFallbackPriceImpact = (): string => {
+      const inputAmount = parseFloat(formatUnits(trade.inputAmount.quotient, trade.inputAmount.currency.decimals))
+      const outputAmount = parseFloat(formatUnits(trade.outputAmount.quotient, trade.outputAmount.currency.decimals))
+
+      if (inputAmount > 0 && outputAmount > 0) {
+        const expectedRate = trade.route?.midPrice?.toSignificant(6)
+        const actualRate = (outputAmount / inputAmount).toFixed(6)
+        if (expectedRate && actualRate) {
+          const impact = Math.abs((parseFloat(actualRate) - parseFloat(expectedRate)) / parseFloat(expectedRate)) * 100
+          return `${impact.toFixed(2)}%`
+        }
+      }
+      return "0.01%"
+    }
+
+    try {
+      // Try to calculate price impact from trade
+      if (trade.priceImpact) {
+        priceImpact = `${trade.priceImpact.toFixed(2)}%`
+      } else {
+        priceImpact = calculateFallbackPriceImpact()
+      }
+    } catch (error) {
+      logger.warn("Failed to compute price impact, using fallback calculation", error)
+      priceImpact = calculateFallbackPriceImpact()
+    }
+
+    const executionPrice = trade.outputAmount.divide(trade.inputAmount).toFixed(6)
+    const minimumReceived = formatUnits(outputAmountWithSlippage.quotient, trade.outputAmount.currency.decimals)
+
+    // Format route path
     const routePath = trade.routes.map((route: any) => {
       const pathSegments = []
       
       for (let i = 0; i < route.path.length - 1; i++) {
         const currentToken = route.path[i]
         const nextToken = route.path[i + 1]
-
         const pool = route.pools[i]
-        
         
         let poolInfo = "Unknown"
         if (pool) {
-          if (pool.type === 0) {
+          // Use PoolType enum for comparison
+          if (pool.type === PoolType.V2) {
             poolInfo = "V2"
-          } else if (pool.type === 1) {
+          } else if (pool.type === PoolType.V3) {
             const fee = pool.fee || "Unknown"
             poolInfo = `V3 ${typeof fee === 'bigint' ? Number(fee)/10000 : fee/10000}%`
+          } else if (pool.type === PoolType.STABLE) {
+            poolInfo = "Stable"
+          } else {
+            poolInfo = `Type${pool.type}`
           }
           
           if (pool.address) {
-            poolInfo += ` ${pool.address}`
+            poolInfo += ` ${pool.address.slice(0, 8)}...`
           }
         }
         
@@ -286,6 +357,7 @@ export class TokenQuoter {
       
       return `(${percent}% [${pathString}])`
     })
+
     // Extract pool information
     const pools = trade.routes.flatMap(route => 
       route.pools.map(pool => {
@@ -302,17 +374,18 @@ export class TokenQuoter {
     return {
       inputToken: trade.inputAmount.currency,
       outputToken: trade.outputAmount.currency,
-      inputAmount: inputAmountRaw,
+      inputAmount: inputAmountRaw, // Already in decimal format
       outputAmount: formatUnits(trade.outputAmount.quotient, trade.outputAmount.currency.decimals),
       outputAmountWithSlippage: minimumReceived,
-      priceImpact: `${priceImpact}%`,
-      route:routePath,
-      pools,
-      gasEstimate: trade.gasEstimate?.toString(),
-      executionPrice,
-      minimumReceived,
+      priceImpact: priceImpact,
+      route: routePath,
+      pools: pools,
+      gasEstimate: trade.gasEstimate ? formatUnits(trade.gasEstimate, 18) : undefined,
+      executionPrice: executionPrice,
+      minimumReceived: minimumReceived,
       routerTime: `${routerTime}ms`,
-      rawTrade: trade,
+      trade: trade, // Include the actual SmartRouterTrade object
+      rawTrade: trade, // Alias for backward compatibility
     }
   }
 }

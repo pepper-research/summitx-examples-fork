@@ -44,6 +44,20 @@ Run the interactive command-line interface:
 pnpm dev
 ```
 
+### Wrap/Unwrap Example
+
+Demonstrates wrapping native CAMP tokens to WCAMP (Wrapped CAMP) and unwrapping back:
+
+```bash
+pnpm dev:wrap
+```
+
+This example shows:
+- Wrapping native CAMP to WCAMP tokens
+- Unwrapping WCAMP back to native CAMP
+- Checking token balances
+- Reading WETH contract state
+
 ## Features
 
 - Get swap quotes for token pairs using SummitX smart-router
@@ -62,16 +76,18 @@ pnpm dev
 Create a `.env` file:
 
 ```env
-BASE_TESTNET_RPC_URL=https://goerli.base.org
+BASE_TESTNET_RPC_URL=https://rpc-campnetwork.xyz
+PRIVATE_KEY=your_private_key_here  # Required for wrap/unwrap example
 ```
 
 ### Supported Tokens
 
-The following tokens are pre-configured for Base testnet:
-- WETH (Wrapped Ether)
-- USDC (USD Coin)
-- SUMMIT (SummitX native token)
-- MockA (Test token)
+The following tokens are pre-configured for Base Camp testnet:
+- WCAMP/WETH (Wrapped CAMP/Ether) - 0x1aE9c40eCd2DD6ad5858E5430A556d7aff28A44b
+- USDC (USD Coin) - 0x71002dbf6cC7A885cE6563682932370c056aAca9
+- SUMMIT (SummitX native token) - 0x052a99849Ef2e13a5CB28275862991671D4b6fF5
+- T12ETH (Test token with 12 decimals) - 0x0bc3f0aF8A5Ef6EA02A256797099e442D95A8Ecc
+- USDT (Tether USD) - 0xA745f7A59E70205e6040BdD3b33eD21DBD23FEB3
 
 ## API
 

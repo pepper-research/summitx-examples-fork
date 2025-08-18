@@ -40,22 +40,27 @@ cp .env.example .env
 
 ```
 src/
-├── archive/              # Archived/unused files
-├── config/              # Chain and token configurations
-│   └── base-testnet.ts  # Base Camp testnet config
-├── debug/               # Debug utilities
-│   ├── check-balance.ts # Check wallet balances
-│   ├── debug-gas.ts     # Gas estimation debugging
-│   ├── debug-swap.ts    # Swap parameter debugging
-│   └── test-quoter.ts   # Test quote functionality
-├── quoter/              # Token quoter implementation
-│   └── token-quoter.ts  # Main quoter class
-├── utils/               # Helper utilities
-│   └── logger.ts        # Logging utility
-├── index.ts             # Main entry point (runs all examples)
-├── swap-examples.ts     # Comprehensive swap examples
-├── single-swap-example.ts # Simple swap example
-└── wrap-unwrap-example.ts # Wrap/unwrap example
+├── archive/                   # Archived/unused files
+├── config/                    # Chain and token configurations
+│   └── base-testnet.ts        # Base Camp testnet config
+├── debug/                     # Debug utilities
+│   ├── check-balance.ts       # Check wallet balances
+│   ├── debug-gas.ts           # Gas estimation debugging
+│   ├── debug-swap.ts          # Swap parameter debugging
+│   ├── quote-example.ts       # Quote testing
+│   └── verify-calldata.ts     # Verify swap calldata
+├── quoter/                    # Token quoter implementation
+│   └── token-quoter.ts        # Main quoter class
+├── utils/                     # Helper utilities
+│   ├── logger.ts              # Logging utility
+│   └── quote-to-trade-converter.ts # Convert quotes to trades
+├── index.ts                   # Main entry point (runs all examples)
+├── native-to-erc20-swap.ts    # Native CAMP to ERC20 swap
+├── erc20-to-native-swap.ts    # ERC20 to native CAMP swap (with unwrap)
+├── erc20-to-erc20-swap.ts     # ERC20 to ERC20 swaps
+├── swap-examples.ts           # Legacy comprehensive swap examples
+├── check-balance.ts           # Balance checking utility
+└── wrap-unwrap-example.ts     # Wrap/unwrap CAMP ↔ WCAMP
 ```
 
 ## 🎯 Quick Start
@@ -64,34 +69,45 @@ src/
 # Check your wallet balances
 npm run check:balance
 
-# Run all examples (wrap/unwrap + swaps) with 5s delays
+# Run all examples (wrap/unwrap + all swap types)
 npm start
 
-# Run individual examples
-npm run wrap-unwrap      # Wrap/unwrap CAMP ↔ WCAMP
-npm run swap            # Run all swap examples
+# Run individual swap examples
+npm run swap:native-to-erc20  # Swap native CAMP to USDC
+npm run swap:erc20-to-native  # Swap USDC to native CAMP
+npm run swap:erc20-to-erc20   # Multiple ERC20 swaps
+
+# Run wrap/unwrap example
+npm run wrap-unwrap            # Convert CAMP ↔ WCAMP
 ```
 
 ## 📝 Available Scripts
 
 ### Main Commands
 
-| Command                 | Description                                        |
-| ----------------------- | -------------------------------------------------- |
-| `npm start`             | Run wrap/unwrap and all swap examples sequentially |
-| `npm run dev`           | Same as npm start                                  |
-| `npm run swap`          | Run comprehensive swap examples                    |
-| `npm run single-swap`   | Run simple single swap example                     |
-| `npm run wrap-unwrap`   | Run wrap/unwrap example only                       |
-| `npm run check:balance` | Check wallet token balances                        |
+| Command                         | Description                                        |
+| ------------------------------- | -------------------------------------------------- |
+| `npm start`                     | Run all examples (wrap/unwrap + all swap types)   |
+| `npm run dev`                   | Same as npm start                                 |
+| `npm run wrap-unwrap`           | Run wrap/unwrap CAMP ↔ WCAMP example              |
+| `npm run check:balance`         | Check wallet token balances                        |
+
+### Swap Commands
+
+| Command                         | Description                                        |
+| ------------------------------- | -------------------------------------------------- |
+| `npm run swap:all`              | Run legacy comprehensive swap examples            |
+| `npm run swap:native-to-erc20` | Swap native CAMP to USDC                          |
+| `npm run swap:erc20-to-native` | Swap USDC to native CAMP (includes unwrap)        |
+| `npm run swap:erc20-to-erc20`  | Run multiple ERC20 to ERC20 swaps                 |
 
 ### Debug Commands
 
-| Command               | Description                    |
-| --------------------- | ------------------------------ |
-| `npm run debug:gas`   | Debug gas estimation issues    |
-| `npm run debug:swap`  | Debug swap parameters          |
-| `npm run debug:quote` | Test quoter with various pairs |
+| Command                  | Description                       |
+| ------------------------ | --------------------------------- |
+| `npm run quote`          | Test quoter functionality         |
+| `npm run debug:gas`      | Debug gas estimation issues       |
+| `npm run debug:verify`   | Verify swap calldata generation  |
 
 ## 💱 Supported Tokens
 
@@ -99,8 +115,8 @@ npm run swap            # Run all swap examples
 | ------------ | ------ | -------- | -------------------------------------------- |
 | Native CAMP  | CAMP   | 18       | Native                                       |
 | Wrapped CAMP | WCAMP  | 18       | `0x1aE9c40eCd2DD6ad5858E5430A556d7aff28A44b` |
-| USD Coin     | USDC   | 6        | `0x91b87b9d7FF81D4115c890F5E0E0fBec65D6f0F8` |
-| Tether       | USDT   | 6        | `0x476c66996B69217e088CAddc60c05fA2c59a43B5` |
+| USD Coin     | USDC   | 6        | `0x71002dbf6cC7A885cE6563682932370c056aAca9` |
+| Tether       | USDT   | 6        | `0xA745f7A59E70205e6040BdD3b33eD21DBD23FEB3` |
 | Wrapped ETH  | WETH   | 18       | `0xC42BAA20e3a159cF7A8aDFA924648C2a2d59E062` |
 | Wrapped BTC  | WBTC   | 18       | `0x587aF234D373C752a6F6E9eD6c4Ce871e7528BCF` |
 | DAI          | DAI    | 18       | `0x5d3011cCc6d3431D671c9e69EEddA9C5C654B97F` |
@@ -128,6 +144,36 @@ const tx = await walletClient.sendTransaction({
 });
 ```
 
+### ERC20 to Native Swap (with automatic unwrap)
+
+```typescript
+// Swap 0.5 USDC to native CAMP
+const quote = await quoter.getQuote(
+  baseCampTestnetTokens.usdc,
+  baseCampTestnetTokens.wcamp, // Quote to WCAMP first
+  "0.5",
+  TradeType.EXACT_INPUT,
+  false
+);
+
+// Execute swap to WCAMP
+const swapTx = await walletClient.sendTransaction({
+  to: SMART_ROUTER_ADDRESS,
+  data: methodParameters.calldata,
+  value: 0n,
+});
+
+// If WCAMP received, automatically unwrap to native CAMP
+if (wcampReceived > 0n) {
+  const unwrapHash = await walletClient.writeContract({
+    address: WCAMP_ADDRESS,
+    abi: WETH_ABI,
+    functionName: "withdraw",
+    args: [wcampReceived],
+  });
+}
+```
+
 ### ERC20 to ERC20 Swap
 
 ```typescript
@@ -135,22 +181,12 @@ const tx = await walletClient.sendTransaction({
 const quote = await quoter.getQuote(
   baseCampTestnetTokens.usdc,
   baseCampTestnetTokens.usdt,
-  "1", // Amount in decimal format
+  "1",
   TradeType.EXACT_INPUT,
   false
 );
 
-// Approve token first
-await checkAndApproveToken(
-  walletClient,
-  publicClient,
-  tokenAddress,
-  amount,
-  walletAddress,
-  SMART_ROUTER_ADDRESS
-);
-
-// Execute swap (no value needed for ERC20 swaps)
+// Approve and execute swap
 const tx = await walletClient.sendTransaction({
   to: SMART_ROUTER_ADDRESS,
   data: methodParameters.calldata,
@@ -286,14 +322,22 @@ The main class for getting swap quotes:
 - **Smart Router**: `0x197b7c9fC5c8AeA84Ab2909Bf94f24370539722D`
 - **V2 Router**: `0x03B38A5C3cf55cB3B8D61Dc7eaB7BBC0ec276708`
 
-## 🎯 Key Fixes Implemented
+## 🎯 Key Features & Fixes
 
+### New Features
+1. **Separated Swap Examples**: Individual files for each swap type (native-to-erc20, erc20-to-native, erc20-to-erc20)
+2. **Automatic Unwrapping**: ERC20 to native swaps automatically unwrap WCAMP to native CAMP
+3. **Comprehensive Logging**: Detailed balance tracking and transaction status reporting
+4. **Multiple Token Support**: Swaps between USDC, USDT, DAI, WETH, WBTC, and native CAMP
+
+### Key Fixes Implemented
 1. **Quote System**: Updated to match reference implementation with proper decimal handling
 2. **Native Swaps**: Fixed by manually setting transaction value for native CAMP
 3. **Router Address**: Fixed contract creation issue by explicitly setting router address
 4. **Gas Estimation**: Removed hardcoded gas limits, let viem estimate automatically
 5. **Rate Limiting**: Added 5-second delays between operations
 6. **Pool Types**: Using PoolType enum for proper pool identification
+7. **ERC20 to Native**: Added automatic WCAMP unwrapping for true native output
 
 ## 🤝 Contributing
 

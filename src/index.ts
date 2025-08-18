@@ -45,15 +45,45 @@ async function main() {
   logger.info("⏳ Waiting 5 seconds before next operation...");
   await new Promise((resolve) => setTimeout(resolve, 5000));
 
-  // Run swap examples
-  logger.header("🔄 Running Swap Examples");
-  const swapSuccess = await runCommand(
-    "npx tsx src/swap-examples.ts",
-    "All Swap Examples"
+  // Run native to ERC20 swap
+  logger.header("🔄 Running Native to ERC20 Swap");
+  const nativeToErc20Success = await runCommand(
+    "npx tsx src/native-to-erc20-swap.ts",
+    "Native CAMP → USDC"
   );
 
-  if (!swapSuccess) {
-    logger.warn("Single swap example failed, continuing...");
+  if (!nativeToErc20Success) {
+    logger.warn("Native to ERC20 swap failed, continuing...");
+  }
+
+  // Wait between operations
+  logger.info("⏳ Waiting 5 seconds before next operation...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // Run ERC20 to native swap
+  logger.header("🔄 Running ERC20 to Native Swap");
+  const erc20ToNativeSuccess = await runCommand(
+    "npx tsx src/erc20-to-native-swap.ts",
+    "USDC → Native CAMP"
+  );
+
+  if (!erc20ToNativeSuccess) {
+    logger.warn("ERC20 to native swap failed, continuing...");
+  }
+
+  // Wait between operations
+  logger.info("⏳ Waiting 5 seconds before next operation...");
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  // Run ERC20 to ERC20 swaps
+  logger.header("🔄 Running ERC20 to ERC20 Swaps");
+  const erc20ToErc20Success = await runCommand(
+    "npx tsx src/erc20-to-erc20-swap.ts",
+    "Multiple ERC20 Swaps"
+  );
+
+  if (!erc20ToErc20Success) {
+    logger.warn("ERC20 to ERC20 swaps failed, continuing...");
   }
 
   // Wait longer between operations
@@ -63,10 +93,13 @@ async function main() {
   logger.divider();
   logger.success("🎉 All examples completed!");
   logger.info("\nAvailable commands:");
-  logger.info("  npm start          - Run this combined example");
-  logger.info("  npm run wrap-unwrap - Run wrap/unwrap example only");
-  logger.info("  npm run swap       - Run comprehensive swap examples");
-  logger.info("  npm run check:balance - Check wallet balances");
+  logger.info("  npm start                - Run all examples");
+  logger.info("  npm run wrap-unwrap      - Run wrap/unwrap example only");
+  logger.info("  npm run swap:native-to-erc20 - Run native to ERC20 swap");
+  logger.info("  npm run swap:erc20-to-native - Run ERC20 to native swap");
+  logger.info("  npm run swap:erc20-to-erc20  - Run ERC20 to ERC20 swaps");
+  logger.info("  npm run swap:all         - Run all swap examples");
+  logger.info("  npm run check:balance    - Check wallet balances");
 }
 
 // Run the main function

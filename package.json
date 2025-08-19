@@ -20,7 +20,13 @@
     "clean": "rm -rf dist && rm -rf node_modules",
     "quote": "tsx src/debug/quote-example.ts",
     "debug:gas": "tsx src/debug/debug-gas.ts",
-    "debug:verify": "tsx src/debug/verify-calldata.ts"
+    "debug:verify": "tsx src/debug/verify-calldata.ts",
+    "liquidity:add-v2": "tsx src/liquidity/add-liquidity-v2.ts",
+    "liquidity:remove-v2": "tsx src/liquidity/remove-liquidity-v2.ts",
+    "liquidity:add-v3": "tsx src/liquidity/add-liquidity-v3.ts",
+    "liquidity:manage": "tsx src/liquidity/manage-positions.ts",
+    "liquidity:native": "tsx src/liquidity/native-liquidity.ts",
+    "liquidity:native-v3": "tsx src/liquidity/native-liquidity-v3.ts"
   },
   "dependencies": {
     "@summitx/chains": "0.1.0",

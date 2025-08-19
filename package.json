@@ -11,6 +11,7 @@
     "swap:all": "tsx src/swap-examples.ts",
     "swap:native-to-erc20": "tsx src/native-to-erc20-swap.ts",
     "swap:erc20-to-native": "tsx src/erc20-to-native-swap.ts",
+    "swap:erc20-to-native-multicall": "tsx src/erc20-to-native-multicall.ts",
     "swap:erc20-to-erc20": "tsx src/erc20-to-erc20-swap.ts",
     "check:balance": "tsx src/check-balance.ts",
     "build": "tsup",

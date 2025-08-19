@@ -5,6 +5,7 @@ A comprehensive suite of examples for interacting with the SummitX DEX on Base C
 ## 🚀 Features
 
 - **Token Swapping**: Native to ERC20, ERC20 to Native, and ERC20 to ERC20 swaps
+- **Multicall Support**: Combine swap + unwrap operations in a single transaction
 - **Wrap/Unwrap**: Convert between native CAMP and wrapped WCAMP tokens
 - **Smart Routing**: Automatic route finding across V3 and Stable pools
 - **Quote System**: Real-time quotes with price impact and slippage calculations
@@ -57,6 +58,9 @@ src/
 ├── index.ts                   # Main entry point (runs all examples)
 ├── native-to-erc20-swap.ts    # Native CAMP to ERC20 swap
 ├── erc20-to-native-swap.ts    # ERC20 to native CAMP swap (with unwrap)
+├── erc20-to-native-multicall.ts     # ERC20 to native using multicall (single tx)
+├── erc20-to-native-multicall-v2.ts  # Alternative multicall approach
+├── erc20-to-native-router-multicall.ts # Router-based multicall implementation
 ├── erc20-to-erc20-swap.ts     # ERC20 to ERC20 swaps
 ├── swap-examples.ts           # Legacy comprehensive swap examples
 ├── check-balance.ts           # Balance checking utility
@@ -99,6 +103,7 @@ npm run wrap-unwrap            # Convert CAMP ↔ WCAMP
 | `npm run swap:all`              | Run legacy comprehensive swap examples            |
 | `npm run swap:native-to-erc20` | Swap native CAMP to USDC                          |
 | `npm run swap:erc20-to-native` | Swap USDC to native CAMP (includes unwrap)        |
+| `npm run swap:erc20-to-native-multicall` | ERC20 to native in single transaction    |
 | `npm run swap:erc20-to-erc20`  | Run multiple ERC20 to ERC20 swaps                 |
 
 ### Debug Commands
@@ -172,6 +177,36 @@ if (wcampReceived > 0n) {
     args: [wcampReceived],
   });
 }
+```
+
+### ERC20 to Native Swap (Multicall - Single Transaction)
+
+```typescript
+// Using router multicall to combine swap + unwrap in one transaction
+const swapParams = SwapRouter.swapCallParameters(trade, {
+  slippageTolerance: new Percent(100, 10000), // 1%
+  deadline: Math.floor(Date.now() / 1000) + 60 * 20,
+  recipient: SMART_ROUTER_ADDRESS, // Router holds WCAMP temporarily
+});
+
+// Create multicall data array
+const multicallData = [
+  swapParams.calldata, // Swap USDC to WCAMP
+  encodeFunctionData({
+    abi: ROUTER_MULTICALL_ABI,
+    functionName: "unwrapWETH9",
+    args: [minAmountOut, account.address], // Unwrap and send to user
+  }),
+];
+
+// Execute both operations atomically
+const txHash = await walletClient.writeContract({
+  address: SMART_ROUTER_ADDRESS,
+  abi: ROUTER_MULTICALL_ABI,
+  functionName: "multicall",
+  args: [multicallData],
+  value: 0n,
+});
 ```
 
 ### ERC20 to ERC20 Swap
@@ -327,8 +362,9 @@ The main class for getting swap quotes:
 ### New Features
 1. **Separated Swap Examples**: Individual files for each swap type (native-to-erc20, erc20-to-native, erc20-to-erc20)
 2. **Automatic Unwrapping**: ERC20 to native swaps automatically unwrap WCAMP to native CAMP
-3. **Comprehensive Logging**: Detailed balance tracking and transaction status reporting
-4. **Multiple Token Support**: Swaps between USDC, USDT, DAI, WETH, WBTC, and native CAMP
+3. **Multicall Implementation**: Single-transaction swap + unwrap using router multicall functionality
+4. **Comprehensive Logging**: Detailed balance tracking and transaction status reporting
+5. **Multiple Token Support**: Swaps between USDC, USDT, DAI, WETH, WBTC, and native CAMP
 
 ### Key Fixes Implemented
 1. **Quote System**: Updated to match reference implementation with proper decimal handling
@@ -338,6 +374,7 @@ The main class for getting swap quotes:
 5. **Rate Limiting**: Added 5-second delays between operations
 6. **Pool Types**: Using PoolType enum for proper pool identification
 7. **ERC20 to Native**: Added automatic WCAMP unwrapping for true native output
+8. **Multicall Support**: Implemented single-transaction swap + unwrap using router multicall
 
 ## 🤝 Contributing
 

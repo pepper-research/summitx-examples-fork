@@ -17,13 +17,14 @@ import {
   WCAMP_ADDRESS,
 } from "../config/base-testnet";
 import { logger } from "../utils/logger";
+import { approveTokenWithWait, waitForTransaction, delay } from "../utils/transaction-helpers";
 import readlineSync from "readline-sync";
 
 config();
 
-// V3 contracts
-const NFT_POSITION_MANAGER = "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1";
-const V3_FACTORY_ADDRESS = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD";
+// V3 contracts for Base Camp Testnet
+const NFT_POSITION_MANAGER = "0x86e08b14ABb30d4E19811EC5C42074b87f6E46b1";
+const V3_FACTORY_ADDRESS = "0x56e72729b46fc7a5C18C3333ACDA52cB57936022";
 
 // ABIs
 const ERC20_ABI = parseAbi([
@@ -35,7 +36,8 @@ const ERC20_ABI = parseAbi([
 ]);
 
 const NFT_POSITION_MANAGER_ABI = parseAbi([
-  "function mint(tuple(address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address recipient, uint256 deadline) params) payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)",
+  "struct MintParams { address token0; address token1; uint24 fee; int24 tickLower; int24 tickUpper; uint256 amount0Desired; uint256 amount1Desired; uint256 amount0Min; uint256 amount1Min; address recipient; uint256 deadline; }",
+  "function mint(MintParams params) payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)",
   "function createAndInitializePoolIfNecessary(address token0, address token1, uint24 fee, uint160 sqrtPriceX96) payable returns (address pool)",
   "function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
   "function multicall(bytes[] calldata data) payable returns (bytes[] memory)",
@@ -76,7 +78,14 @@ function tickToPrice(tick: number): number {
 }
 
 function priceToTick(price: number): number {
-  return Math.floor(Math.log(price) / Math.log(1.0001));
+  if (price <= 0 || !isFinite(price)) {
+    throw new Error(`Invalid price for tick calculation: ${price}`);
+  }
+  const tick = Math.floor(Math.log(price) / Math.log(1.0001));
+  if (!isFinite(tick)) {
+    throw new Error(`Tick calculation resulted in invalid value for price: ${price}`);
+  }
+  return tick;
 }
 
 function getNearestUsableTick(tick: number, tickSpacing: number): number {
@@ -114,34 +123,6 @@ async function getTokenInfo(
   return { address: tokenAddress, symbol, decimals, balance };
 }
 
-async function checkAndApproveToken(
-  walletClient: any,
-  publicClient: any,
-  tokenAddress: Address,
-  amount: bigint,
-  spender: Address
-) {
-  const account = walletClient.account.address;
-  
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [account, spender],
-  });
-
-  if (allowance < amount) {
-    logger.info(`Approving ${tokenAddress} for NFT Position Manager...`);
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [spender, amount],
-    });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
-  }
-}
 
 async function main() {
   logger.header("💧 Add Liquidity V3 Example");
@@ -251,52 +232,152 @@ async function main() {
     logger.success(`Selected fee tier: ${selectedFeeTier.name}`);
 
     // Check if pool exists
-    const poolAddress = await publicClient.readContract({
-      address: V3_FACTORY_ADDRESS,
-      abi: V3_FACTORY_ABI,
-      functionName: "getPool",
-      args: [tokenA.address, tokenB.address, selectedFeeTier.fee],
-    });
+    let poolAddress: string = "0x0000000000000000000000000000000000000000";
+    let poolCheckFailed = false;
+    
+    try {
+      logger.info(`Checking for pool: ${tokenA.symbol}/${tokenB.symbol} with fee ${selectedFeeTier.fee}`);
+      const result = await publicClient.readContract({
+        address: V3_FACTORY_ADDRESS,
+        abi: V3_FACTORY_ABI,
+        functionName: "getPool",
+        args: [tokenA.address, tokenB.address, selectedFeeTier.fee],
+      });
+      poolAddress = result || "0x0000000000000000000000000000000000000000";
+      logger.info(`Pool check successful, result: ${poolAddress}`);
+    } catch (error: any) {
+      logger.warn(`Could not check pool existence: ${error.message}`);
+      if (error.message.includes("returned no data")) {
+        logger.warn(`V3 Factory contract may not be deployed or accessible`);
+        poolCheckFailed = true;
+      }
+      logger.warn(`Assuming pool doesn't exist, will create new pool`);
+      poolAddress = "0x0000000000000000000000000000000000000000";
+    }
 
-    let currentTick = 0;
-    let currentPrice = 1;
+    let currentTick: number = NaN;
+    let currentPrice: number = NaN;
     let poolExists = false;
 
-    if (poolAddress !== "0x0000000000000000000000000000000000000000") {
+    // If pool check failed completely, we need to handle this specially
+    if (poolCheckFailed) {
+      logger.warn("⚠️ V3 Factory check failed - assuming new deployment needed");
+      // Force pool creation flow
+      poolExists = false;
+    } else {
+      logger.info(`Pool address returned: ${poolAddress}`);
+      logger.info(`Checking if pool exists: ${poolAddress !== "0x0000000000000000000000000000000000000000"}`);
+    }
+
+    if (!poolCheckFailed && poolAddress && poolAddress.toLowerCase() !== "0x0000000000000000000000000000000000000000") {
       poolExists = true;
       logger.info(`\n📊 Pool exists at: ${poolAddress}`);
       
-      // Get current pool state
-      const slot0 = await publicClient.readContract({
-        address: poolAddress,
-        abi: V3_POOL_ABI,
-        functionName: "slot0",
-      });
-
-      currentTick = slot0.tick;
-      currentPrice = tickToPrice(currentTick);
+      try {
+        // Get current pool state
+        logger.info("Reading pool state from slot0...");
+        const slot0 = await publicClient.readContract({
+          address: poolAddress,
+          abi: V3_POOL_ABI,
+          functionName: "slot0",
+        });
+        
+        logger.info(`Raw slot0 data: ${JSON.stringify(slot0)}`);
+        
+        // slot0 returns a tuple/object with: sqrtPriceX96, tick, observationIndex, etc.
+        // The tick is either at index 1 or accessible as .tick property
+        let tickValue;
+        if (Array.isArray(slot0)) {
+          tickValue = slot0[1];
+        } else if (typeof slot0 === 'object' && slot0 !== null) {
+          tickValue = (slot0 as any).tick ?? (slot0 as any)[1];
+        } else {
+          tickValue = slot0;
+        }
+        
+        logger.info(`Extracted tick value: ${tickValue}`);
+        
+        if (tickValue !== undefined && tickValue !== null) {
+          // Handle BigInt conversion if needed
+          if (typeof tickValue === 'bigint') {
+            currentTick = Number(tickValue);
+          } else {
+            currentTick = Number(tickValue);
+          }
+          
+          // Check if the pool is initialized (tick should be non-zero for initialized pools)
+          if (Number.isFinite(currentTick) && currentTick !== 0) {
+            currentPrice = tickToPrice(currentTick);
+            logger.info(`Current tick: ${currentTick}`);
+            logger.info(`Current price: ${currentPrice.toFixed(6)} ${tokenB.symbol}/${tokenA.symbol}`);
+          } else if (currentTick === 0) {
+            logger.warn("Pool exists but appears uninitialized (tick = 0)");
+            logger.warn("You'll need to set an initial price");
+            poolExists = false; // Treat as non-existent if uninitialized
+          } else {
+            logger.warn(`Invalid tick value from pool: ${tickValue}`);
+            poolExists = false; // Treat as non-existent if we can't read it
+          }
+        } else {
+          logger.warn("Could not extract tick from slot0 data");
+          poolExists = false; // Treat as non-existent if we can't read it
+        }
+      } catch (error: any) {
+        logger.warn(`Failed to read pool state: ${error.message}`);
+        logger.warn("Pool may be uninitialized, treating as new pool");
+        poolExists = false; // Treat as non-existent if we can't read it
+      }
+    } 
+    
+    // If pool doesn't exist OR we couldn't get pool data, need to set initial price
+    if (!poolExists || !Number.isFinite(currentTick)) {
+      logger.warn("⚠️ Pool doesn't exist or couldn't get pool data - will be created");
       
-      logger.info(`Current tick: ${currentTick}`);
-      logger.info(`Current price: ${currentPrice.toFixed(6)} ${tokenB.symbol}/${tokenA.symbol}`);
-    } else {
-      logger.warn("⚠️ Pool doesn't exist - will be created");
+      // For new pools, we need to set an initial price
+      // Default to 1:1 ratio if tokens have same decimals, otherwise adjust
+      const decimalDiff = tokenB.decimals - tokenA.decimals;
+      const defaultPrice = Math.pow(10, decimalDiff);
+      
+      logger.info(`\nToken decimals: ${tokenA.symbol}=${tokenA.decimals}, ${tokenB.symbol}=${tokenB.decimals}`);
+      logger.info(`Suggested initial price: ${defaultPrice} ${tokenB.symbol} per ${tokenA.symbol}`);
+      logger.info("(Based on decimal difference between tokens)");
+      logger.info("Note: For stablecoins paired with non-stables, you may want to adjust this.");
       
       // Ask for initial price
       const initialPrice = readlineSync.question(
-        `Enter initial price (${tokenB.symbol} per ${tokenA.symbol}): `
+        `Enter initial price (${tokenB.symbol} per ${tokenA.symbol}) [${defaultPrice}]: `
       );
       
-      if (!initialPrice || isNaN(Number(initialPrice))) {
-        logger.error("Invalid price");
+      if (initialPrice === "") {
+        currentPrice = defaultPrice;
+      } else if (!initialPrice || isNaN(Number(initialPrice)) || Number(initialPrice) <= 0) {
+        logger.error("Invalid price - must be a positive number");
         return;
+      } else {
+        currentPrice = Number(initialPrice);
       }
       
-      currentPrice = Number(initialPrice);
-      currentTick = priceToTick(currentPrice);
+      try {
+        currentTick = priceToTick(currentPrice);
+        logger.info(`Using price: ${currentPrice} (tick: ${currentTick})`);
+      } catch (error: any) {
+        logger.error(`Failed to calculate tick: ${error.message}`);
+        return;
+      }
+    }
+
+    // Validate that we have valid price and tick values before continuing
+    if (!Number.isFinite(currentPrice) || !Number.isFinite(currentTick)) {
+      logger.error("Failed to establish current price and tick values.");
+      logger.error(`Current price: ${currentPrice}, Current tick: ${currentTick}`);
+      logger.error("Cannot proceed without valid price information.");
+      return;
     }
 
     // Set price range
     logger.info("\n📈 Set your price range:");
+    logger.info(`Current price: ${currentPrice.toFixed(6)} ${tokenB.symbol}/${tokenA.symbol}`);
+    logger.info(`Current tick: ${currentTick}`);
     logger.info("Current price is your reference point");
     
     const rangeOptions = [
@@ -317,21 +398,34 @@ async function main() {
       return;
     }
 
-    let tickLower: number;
-    let tickUpper: number;
+    let tickLower: number = 0;
+    let tickUpper: number = 0;
+
+    logger.info(`Current tick before range selection: ${currentTick}`);
+    logger.info(`Range option selected: ${rangeIndex}`);
+
+    // Ensure currentTick is valid before proceeding
+    if (!Number.isFinite(currentTick)) {
+      logger.error(`Invalid currentTick value: ${currentTick}`);
+      logger.error("Cannot proceed with price range selection.");
+      return;
+    }
 
     switch (rangeIndex) {
       case 0: // Narrow
         tickLower = currentTick - 1000;
         tickUpper = currentTick + 1000;
+        logger.debug(`Narrow range: currentTick=${currentTick}, tickLower=${tickLower}, tickUpper=${tickUpper}`);
         break;
       case 1: // Medium
         tickLower = currentTick - 2500;
         tickUpper = currentTick + 2500;
+        logger.debug(`Medium range: currentTick=${currentTick}, tickLower=${tickLower}, tickUpper=${tickUpper}`);
         break;
       case 2: // Wide
         tickLower = currentTick - 5000;
         tickUpper = currentTick + 5000;
+        logger.debug(`Wide range: currentTick=${currentTick}, tickLower=${tickLower}, tickUpper=${tickUpper}`);
         break;
       case 3: // Full range
         tickLower = -887220;
@@ -357,9 +451,23 @@ async function main() {
         return;
     }
 
+    // Validate tick values
+    if (isNaN(tickLower) || isNaN(tickUpper)) {
+      logger.error("Invalid tick values calculated. Please check your price inputs.");
+      logger.error(`Details: currentTick=${currentTick}, tickLower=${tickLower}, tickUpper=${tickUpper}`);
+      logger.error(`This usually happens when the initial price wasn't set correctly.`);
+      return;
+    }
+
     // Adjust ticks to nearest usable tick
     tickLower = getNearestUsableTick(tickLower, selectedFeeTier.tickSpacing);
     tickUpper = getNearestUsableTick(tickUpper, selectedFeeTier.tickSpacing);
+
+    // Ensure tickLower < tickUpper
+    if (tickLower >= tickUpper) {
+      logger.error("Lower tick must be less than upper tick");
+      return;
+    }
 
     const priceLower = tickToPrice(tickLower);
     const priceUpper = tickToPrice(tickUpper);
@@ -418,32 +526,42 @@ async function main() {
       return;
     }
 
-    // Approve tokens
+    // Approve tokens with waiting period
     logger.info("\n🔐 Approving tokens...");
-    await checkAndApproveToken(
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       tokenA.address,
+      NFT_POSITION_MANAGER as Address,
       amount0Desired,
-      NFT_POSITION_MANAGER as Address
+      tokenA.symbol,
+      3000 // 3 second wait after approval
     );
-    await checkAndApproveToken(
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       tokenB.address,
+      NFT_POSITION_MANAGER as Address,
       amount1Desired,
-      NFT_POSITION_MANAGER as Address
+      tokenB.symbol,
+      3000 // 3 second wait after approval
     );
 
     // Prepare mint parameters
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20);
 
+    // Final validation before minting
+    if (isNaN(tickLower) || isNaN(tickUpper) || !Number.isInteger(tickLower) || !Number.isInteger(tickUpper)) {
+      logger.error("Invalid tick values. Cannot proceed with minting.");
+      return;
+    }
+
     const mintParams = {
       token0: tokenA.address,
       token1: tokenB.address,
       fee: selectedFeeTier.fee,
-      tickLower,
-      tickUpper,
+      tickLower: tickLower,
+      tickUpper: tickUpper,
       amount0Desired,
       amount1Desired,
       amount0Min,
@@ -453,6 +571,9 @@ async function main() {
     };
 
     logger.info("\n💧 Adding liquidity to V3 pool...");
+    if (!poolExists) {
+      logger.info("📝 Pool will be created automatically with your liquidity");
+    }
 
     // Check if using native CAMP
     const isToken0WCAMP = tokenA.address.toLowerCase() === WCAMP_ADDRESS.toLowerCase();

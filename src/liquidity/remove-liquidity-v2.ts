@@ -12,6 +12,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { basecampTestnet, WCAMP_ADDRESS } from "../config/base-testnet";
 import { logger } from "../utils/logger";
+import { waitForTransaction, delay } from "../utils/transaction-helpers";
 
 config();
 
@@ -193,15 +194,19 @@ async function checkAndApproveLP(
   });
 
   if (allowance < amount) {
-    logger.info(`Approving LP tokens for router...`);
+    logger.info(`📝 Approving LP tokens for router...`);
     const hash = await walletClient.writeContract({
       address: lpTokenAddress,
       abi: ERC20_ABI,
       functionName: "approve",
       args: [V2_ROUTER_ADDRESS as Address, amount],
     });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ LP tokens approved");
+    await waitForTransaction(publicClient, hash, "LP token approval");
+    
+    // Add a delay after approval to ensure the transaction is fully processed
+    await delay(3000, "⏳ Waiting 3 seconds after approval before proceeding...");
+  } else {
+    logger.info("✅ LP tokens already approved");
   }
 }
 

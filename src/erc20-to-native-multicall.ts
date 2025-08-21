@@ -20,30 +20,11 @@ import {
 } from "./config/base-testnet";
 import { TokenQuoter } from "./quoter/token-quoter";
 import { logger } from "./utils/logger";
+import { approveTokenWithWait, waitForTransaction, delay } from "./utils/transaction-helpers";
 
 config();
 
 const ERC20_ABI = [
-  {
-    name: "approve",
-    type: "function",
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-  },
-  {
-    name: "allowance",
-    type: "function",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-  },
   {
     name: "balanceOf",
     type: "function",
@@ -105,37 +86,7 @@ const ROUTER_MULTICALL_ABI = [
   },
 ] as const;
 
-async function checkAndApproveToken(
-  walletClient: any,
-  publicClient: any,
-  tokenAddress: Address,
-  amount: bigint,
-  walletAddress: Address
-) {
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [walletAddress, SMART_ROUTER_ADDRESS as Address],
-  });
 
-  if (allowance < amount) {
-    logger.info(`Approving ${formatUnits(amount, 6)} USDC...`);
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [SMART_ROUTER_ADDRESS as Address, amount],
-    });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
-  }
-}
-
-async function delay(ms: number) {
-  logger.info(`⏳ Waiting ${ms / 1000} seconds...`);
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function main() {
   logger.header("🔄 ERC20 to Native Swap with Multicall");
@@ -239,13 +190,15 @@ async function main() {
       `Initial WCAMP balance: ${formatUnits(wcampBalanceBefore, 18)}`
     );
 
-    // Approve USDC
-    await checkAndApproveToken(
+    // Approve USDC with waiting period
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       baseCampTestnetTokens.usdc.address as Address,
+      SMART_ROUTER_ADDRESS as Address,
       parseUnits(swapAmount, 6),
-      account.address
+      "USDC",
+      3000 // 3 second wait after approval
     );
 
     // Generate swap parameters - swap to router first to handle the unwrap
@@ -286,16 +239,12 @@ async function main() {
 
     logger.info(`Transaction sent: ${txHash}`);
 
-    const receipt = await publicClient.waitForTransactionReceipt({
-      hash: txHash,
-    });
+    await waitForTransaction(publicClient, txHash, "multicall swap + unwrap");
+    
+    // Add small delay after swap to ensure state is updated
+    await delay(2000, "⏳ Waiting for blockchain state to update...");
 
-    if (receipt.status === "success") {
-      logger.success(
-        `✅ Multicall swap + unwrap successful! Gas used: ${receipt.gasUsed}`
-      );
-
-      // Check final balances
+    // Check final balances
       const [finalNativeBalance, wcampBalanceAfter, finalUsdcBalance] =
         await Promise.all([
           publicClient.getBalance({ address: account.address }),
@@ -313,10 +262,9 @@ async function main() {
           }),
         ]);
 
-      // Calculate net native received (accounting for gas)
-      const gasSpent = receipt.gasUsed * receipt.effectiveGasPrice;
+      // Calculate net native received
       const nativeReceived =
-        finalNativeBalance - initialNativeBalance + gasSpent;
+        finalNativeBalance - initialNativeBalance;
 
       logger.success("Balance changes:", {
         USDC: `${formatUnits(usdcBalance, 6)} → ${formatUnits(
@@ -331,8 +279,7 @@ async function main() {
           initialNativeBalance,
           18
         )} → ${formatUnits(finalNativeBalance, 18)}`,
-        "CAMP received": formatUnits(nativeReceived, 18),
-        "Gas spent": formatUnits(gasSpent, 18),
+        "CAMP received (net)": formatUnits(nativeReceived, 18),
       });
 
       logger.success(

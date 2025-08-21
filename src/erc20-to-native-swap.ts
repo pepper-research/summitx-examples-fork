@@ -19,30 +19,11 @@ import {
 } from "./config/base-testnet";
 import { TokenQuoter } from "./quoter/token-quoter";
 import { logger } from "./utils/logger";
+import { approveTokenWithWait, waitForTransaction, delay } from "./utils/transaction-helpers";
 
 config();
 
 const ERC20_ABI = [
-  {
-    name: "approve",
-    type: "function",
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-  },
-  {
-    name: "allowance",
-    type: "function",
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-  },
   {
     name: "balanceOf",
     type: "function",
@@ -52,37 +33,7 @@ const ERC20_ABI = [
   },
 ] as const;
 
-async function checkAndApproveToken(
-  walletClient: any,
-  publicClient: any,
-  tokenAddress: Address,
-  amount: bigint,
-  walletAddress: Address
-) {
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [walletAddress, SMART_ROUTER_ADDRESS as Address],
-  });
 
-  if (allowance < amount) {
-    logger.info(`Approving ${formatUnits(amount, 6)} USDC...`);
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [SMART_ROUTER_ADDRESS as Address, amount],
-    });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
-  }
-}
-
-async function delay(ms: number) {
-  logger.info(`⏳ Waiting ${ms / 1000} seconds...`);
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function main() {
   logger.header("🔄 ERC20 to Native Swap Example");
@@ -168,13 +119,15 @@ async function main() {
     const initialNativeBalance = await publicClient.getBalance({ address: account.address });
     logger.info(`Initial CAMP balance: ${formatUnits(initialNativeBalance, 18)}`);
 
-    // Approve USDC
-    await checkAndApproveToken(
+    // Approve USDC with waiting period
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       baseCampTestnetTokens.usdc.address as Address,
+      SMART_ROUTER_ADDRESS as Address,
       parseUnits(swapAmount, 6),
-      account.address
+      "USDC",
+      3000 // 3 second wait after approval
     );
 
     // Generate swap parameters
@@ -206,14 +159,12 @@ async function main() {
 
     logger.info(`Transaction sent: ${swapHash}`);
     
-    const receipt = await publicClient.waitForTransactionReceipt({ 
-      hash: swapHash 
-    });
-
-    if (receipt.status === "success") {
-      logger.success(`✅ Swap successful! Gas used: ${receipt.gasUsed}`);
-      
-      // Check balances after swap
+    await waitForTransaction(publicClient, swapHash, "swap transaction");
+    
+    // Add small delay after swap to ensure state is updated
+    await delay(2000, "⏳ Waiting for blockchain state to update...");
+    
+    // Check balances after swap
       const [wcampBalanceAfter, finalUsdcBalance] = await Promise.all([
         publicClient.readContract({
           address: WCAMP_ADDRESS as Address,

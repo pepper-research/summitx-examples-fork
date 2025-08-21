@@ -13,6 +13,7 @@ import {
 import { CONTRACTS, TX_DEFAULTS, getDeadline, applySlippage } from "../config/contracts";
 import { ABIS } from "../config/abis";
 import { logger } from "./logger";
+import { waitForTransaction, delay } from "./transaction-helpers";
 
 // Types
 export interface TokenInfo {
@@ -106,7 +107,7 @@ export async function checkAndApproveToken(
   });
 
   if (allowance < amount) {
-    logger.info(`Approving ${tokenSymbol || tokenAddress} for ${formatUnits(amount, 18)}...`);
+    logger.info(`📝 Approving ${tokenSymbol || tokenAddress} for ${formatUnits(amount, 18)}...`);
     
     const hash = await walletClient.writeContract({
       address: tokenAddress,
@@ -115,8 +116,12 @@ export async function checkAndApproveToken(
       args: [spender, amount],
     });
     
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
+    await waitForTransaction(publicClient, hash, `${tokenSymbol || "token"} approval`);
+    
+    // Add a delay after approval to ensure the transaction is fully processed
+    await delay(3000, "⏳ Waiting 3 seconds after approval before proceeding...");
+  } else {
+    logger.info(`✅ ${tokenSymbol || "Token"} already approved`);
   }
 }
 

@@ -17,6 +17,7 @@ import {
   WCAMP_ADDRESS,
 } from "../config/base-testnet";
 import { logger } from "../utils/logger";
+import { approveTokenWithWait, waitForTransaction, delay } from "../utils/transaction-helpers";
 
 config();
 
@@ -89,34 +90,6 @@ async function getTokenInfo(
   return { address: tokenAddress, symbol, decimals, balance };
 }
 
-async function checkAndApproveToken(
-  walletClient: any,
-  publicClient: any,
-  tokenAddress: Address,
-  amount: bigint,
-  spender: Address
-) {
-  const account = walletClient.account.address;
-
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [account, spender],
-  });
-
-  if (allowance < amount) {
-    logger.info(`Approving ${tokenAddress} for router...`);
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [spender, amount],
-    });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
-  }
-}
 
 async function getPairInfo(
   publicClient: any,
@@ -402,21 +375,25 @@ async function main() {
       return;
     }
 
-    // Approve tokens
+    // Approve tokens with waiting period
     logger.info("\n🔐 Approving tokens...");
-    await checkAndApproveToken(
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       tokenA.address,
+      V2_ROUTER_ADDRESS as Address,
       amountA,
-      V2_ROUTER_ADDRESS as Address
+      tokenA.symbol,
+      3000 // 3 second wait after approval
     );
-    await checkAndApproveToken(
+    await approveTokenWithWait(
       walletClient,
       publicClient,
       tokenB.address,
+      V2_ROUTER_ADDRESS as Address,
       amountB,
-      V2_ROUTER_ADDRESS as Address
+      tokenB.symbol,
+      3000 // 3 second wait after approval
     );
 
     // Add liquidity

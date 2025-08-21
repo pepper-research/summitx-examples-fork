@@ -17,6 +17,7 @@ import {
   WCAMP_ADDRESS,
 } from "../config/base-testnet";
 import { logger } from "../utils/logger";
+import { approveTokenWithWait, waitForTransaction, delay } from "../utils/transaction-helpers";
 
 config();
 
@@ -142,34 +143,6 @@ async function getPairInfo(publicClient: any, tokenAddress: Address) {
   };
 }
 
-async function checkAndApproveToken(
-  walletClient: any,
-  publicClient: any,
-  tokenAddress: Address,
-  amount: bigint,
-  spender: Address
-) {
-  const account = walletClient.account.address;
-
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [account, spender],
-  });
-
-  if (allowance < amount) {
-    logger.info(`Approving token for router...`);
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "approve",
-      args: [spender, amount],
-    });
-    await publicClient.waitForTransactionReceipt({ hash });
-    logger.success("✅ Token approved");
-  }
-}
 
 async function main() {
   logger.header("⚡ Native CAMP Liquidity Management");
@@ -405,14 +378,16 @@ async function main() {
         return;
       }
 
-      // Approve token
+      // Approve token with waiting period
       logger.info("\n🔐 Approving token...");
-      await checkAndApproveToken(
+      await approveTokenWithWait(
         walletClient,
         publicClient,
         selectedToken.address,
+        V2_ROUTER_ADDRESS as Address,
         tokenAmount,
-        V2_ROUTER_ADDRESS as Address
+        selectedToken.symbol,
+        3000 // 3 second wait after approval
       );
 
       // Add liquidity with native CAMP
@@ -619,14 +594,16 @@ async function main() {
         return;
       }
 
-      // Approve LP tokens
+      // Approve LP tokens with waiting period
       logger.info("\n🔐 Approving LP tokens...");
-      await checkAndApproveToken(
+      await approveTokenWithWait(
         walletClient,
         publicClient,
         selectedPosition.pairAddress,
+        V2_ROUTER_ADDRESS as Address,
         lpAmountToRemove,
-        V2_ROUTER_ADDRESS as Address
+        "LP Token",
+        3000 // 3 second wait after approval
       );
 
       // Remove liquidity and receive native CAMP

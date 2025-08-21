@@ -101,26 +101,59 @@ async function getTokenInfo(
   tokenAddress: Address,
   userAddress: Address
 ): Promise<TokenInfo> {
-  const [symbol, decimals, balance] = await Promise.all([
-    publicClient.readContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "symbol",
-    }),
-    publicClient.readContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "decimals",
-    }),
-    publicClient.readContract({
-      address: tokenAddress,
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [userAddress],
-    }),
-  ]);
+  try {
+    // First check if the address has code (is a contract)
+    const code = await publicClient.getBytecode({ address: tokenAddress });
+    if (!code || code === '0x') {
+      throw new Error(`Address ${tokenAddress} is not a contract on this network`);
+    }
+    
+    // Try to fetch each property individually to identify which one fails
+    let symbol = "UNKNOWN";
+    let decimals = 18;
+    let balance = 0n;
+    
+    try {
+      symbol = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "symbol",
+      });
+    } catch (e: any) {
+      logger.warn(`Failed to get symbol for ${tokenAddress}: ${e?.message?.includes('StackOverflow') ? 'Contract has StackOverflow issue' : e?.message}`);
+      // Use a fallback symbol
+      symbol = `TOKEN_${tokenAddress.slice(0, 6)}`;
+    }
+    
+    try {
+      decimals = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "decimals",
+      });
+    } catch (e: any) {
+      logger.warn(`Failed to get decimals for ${tokenAddress}, using 18`);
+      decimals = 18;
+    }
+    
+    try {
+      balance = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [userAddress],
+      });
+    } catch (e: any) {
+      logger.warn(`Failed to get balance for ${tokenAddress}`);
+      balance = 0n;
+    }
 
-  return { address: tokenAddress, symbol, decimals, balance };
+    return { address: tokenAddress, symbol, decimals, balance };
+  } catch (error: any) {
+    logger.error(`Failed to fetch token info for ${tokenAddress}`);
+    logger.error(`Error: ${error?.message || error}`);
+    throw error;
+  }
 }
 
 
@@ -154,29 +187,64 @@ async function main() {
   logger.info(`Wallet address: ${account.address}`);
 
   try {
-    // Get available tokens
+    // Get available tokens with fallback info
     const tokens = [
-      baseCampTestnetTokens.wcamp,
-      baseCampTestnetTokens.usdc,
-      baseCampTestnetTokens.usdt,
-      baseCampTestnetTokens.dai,
-      baseCampTestnetTokens.weth,
-      baseCampTestnetTokens.wbtc,
+      { ...baseCampTestnetTokens.wcamp, fallbackSymbol: "wCAMP", fallbackDecimals: 18 },
+      { ...baseCampTestnetTokens.usdc, fallbackSymbol: "MUSDC", fallbackDecimals: 6 },
+      { ...baseCampTestnetTokens.usdt, fallbackSymbol: "MUSDT", fallbackDecimals: 6 },
+      { ...baseCampTestnetTokens.dai, fallbackSymbol: "DAI", fallbackDecimals: 18 },
+      { ...baseCampTestnetTokens.weth, fallbackSymbol: "WETH", fallbackDecimals: 18 },
+      { ...baseCampTestnetTokens.wbtc, fallbackSymbol: "WBTC", fallbackDecimals: 8 },
     ];
 
     // Get token balances
-    logger.info("\n📊 Available tokens:");
+    logger.info("\n📊 Checking available tokens:");
     const tokenInfos: TokenInfo[] = [];
-    for (const token of tokens) {
-      const info = await getTokenInfo(
-        publicClient,
-        token.address as Address,
-        account.address
-      );
-      tokenInfos.push(info);
-      logger.info(
-        `${info.symbol}: ${formatUnits(info.balance, info.decimals)}`
-      );
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      logger.info(`\n[${i + 1}/${tokens.length}] Checking ${token.fallbackSymbol}...`);
+      
+      try {
+        const info = await getTokenInfo(
+          publicClient,
+          token.address as Address,
+          account.address
+        );
+        tokenInfos.push(info);
+        logger.success(
+          `✅ ${info.symbol}: ${formatUnits(info.balance, info.decimals)}`
+        );
+      } catch (error: any) {
+        logger.warn(`⚠️ Contract issue detected for ${token.fallbackSymbol} at ${token.address}`);
+        // Use fallback token info if the contract has issues
+        try {
+          const balance = await publicClient.readContract({
+            address: token.address as Address,
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [account.address],
+          });
+          
+          const fallbackInfo: TokenInfo = {
+            address: token.address as Address,
+            symbol: token.fallbackSymbol,
+            decimals: token.fallbackDecimals,
+            balance: balance || 0n,
+          };
+          
+          tokenInfos.push(fallbackInfo);
+          logger.info(
+            `${fallbackInfo.symbol}: ${formatUnits(fallbackInfo.balance, fallbackInfo.decimals)}`
+          );
+        } catch (e) {
+          logger.error(`Failed to get balance for ${token.fallbackSymbol}, skipping...`);
+        }
+      }
+    }
+    
+    if (tokenInfos.length < 2) {
+      logger.error("Not enough valid tokens found. Need at least 2 tokens to create a pair.");
+      return;
     }
 
     // Interactive token selection
@@ -282,7 +350,8 @@ async function main() {
           functionName: "slot0",
         });
         
-        logger.info(`Raw slot0 data: ${JSON.stringify(slot0)}`);
+        // Don't try to stringify slot0 directly as it contains BigInt values
+        // logger.info(`Raw slot0 data: ${JSON.stringify(slot0)}`); // This causes BigInt serialization error
         
         // slot0 returns a tuple/object with: sqrtPriceX96, tick, observationIndex, etc.
         // The tick is either at index 1 or accessible as .tick property
@@ -295,7 +364,9 @@ async function main() {
           tickValue = slot0;
         }
         
-        logger.info(`Extracted tick value: ${tickValue}`);
+        // Convert BigInt to string for logging to avoid serialization error
+        const tickValueDisplay = typeof tickValue === 'bigint' ? tickValue.toString() : tickValue;
+        logger.info(`Extracted tick value: ${tickValueDisplay}`);
         
         if (tickValue !== undefined && tickValue !== null) {
           // Handle BigInt conversion if needed
@@ -315,7 +386,8 @@ async function main() {
             logger.warn("You'll need to set an initial price");
             poolExists = false; // Treat as non-existent if uninitialized
           } else {
-            logger.warn(`Invalid tick value from pool: ${tickValue}`);
+            const tickDisplay = typeof tickValue === 'bigint' ? tickValue.toString() : tickValue;
+            logger.warn(`Invalid tick value from pool: ${tickDisplay}`);
             poolExists = false; // Treat as non-existent if we can't read it
           }
         } else {

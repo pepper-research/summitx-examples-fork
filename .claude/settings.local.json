@@ -8,7 +8,9 @@
       "Bash(npm run:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(npx pnpm liquidity:add-v3:*)"
+      "Bash(npx pnpm liquidity:add-v3:*)",
+      "Bash(npx pnpm:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

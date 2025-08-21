@@ -13,7 +13,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { basecampTestnet, baseCampTestnetTokens } from "../config/base-testnet";
 import { CONTRACTS, V3_FEE_TIERS, V3_TICK_SPACINGS, getDeadline, applySlippage } from "../config/contracts";
-import { ABIS } from "../config/abis";
+import { NFT_POSITION_MANAGER_ABI } from "../config/abis";
 import { 
   LiquidityHelpers,
   type TokenInfo 
@@ -192,29 +192,66 @@ async function addV3NativeLiquidity(
 
   let currentTick = 0;
   let currentPrice = 1;
+  let sqrtPriceX96 = 0n;
 
   if (poolInfo) {
     logger.info(`\n📊 Pool exists at: ${poolInfo.poolAddress}`);
     currentTick = poolInfo.tick;
-    currentPrice = LiquidityHelpers.tickToPrice(currentTick);
+    sqrtPriceX96 = poolInfo.sqrtPriceX96;
     
+    // Debug: log pool tokens
+    logger.info(`Pool token0: ${poolInfo.token0}`);
+    logger.info(`Pool token1: ${poolInfo.token1}`);
     logger.info(`Current tick: ${currentTick}`);
-    logger.info(`Current price: ${currentPrice.toFixed(6)}`);
+    logger.info(`SqrtPriceX96: ${sqrtPriceX96}`);
+    
+    // Calculate actual price from sqrtPriceX96
+    // price = (sqrtPriceX96 / 2^96)^2
+    const sqrtPrice = Number(sqrtPriceX96) / (2 ** 96);
+    currentPrice = sqrtPrice * sqrtPrice;
+    
+    // Adjust price based on decimals
+    const token0Decimals = isNativeToken0 ? 18 : selectedToken.decimals;
+    const token1Decimals = isNativeToken0 ? selectedToken.decimals : 18;
+    const decimalAdjustment = 10 ** (token1Decimals - token0Decimals);
+    const adjustedPrice = currentPrice * decimalAdjustment;
+    
+    // Display the price correctly
+    if (isNativeToken0) {
+      logger.info(`Current price: 1 CAMP = ${adjustedPrice.toFixed(6)} ${selectedToken.symbol}`);
+    } else {
+      const invertedPrice = 1 / adjustedPrice;
+      logger.info(`Current price: 1 ${selectedToken.symbol} = ${invertedPrice.toFixed(6)} CAMP`);
+    }
+    
+    currentPrice = adjustedPrice;
   } else {
     logger.warn("⚠️ Pool doesn't exist - will be created");
     
-    // Ask for initial price
-    const initialPrice = readlineSync.question(
-      `Enter initial price (${!isNativeToken0 ? selectedToken.symbol : "CAMP"} per ${isNativeToken0 ? selectedToken.symbol : "CAMP"}): `
-    );
-    
-    if (!initialPrice || isNaN(Number(initialPrice))) {
-      logger.error("Invalid price");
-      return;
+    // Set a default price for common pairs or ask user
+    if (selectedToken.symbol === "USDC" || selectedToken.symbol === "USDT" || selectedToken.symbol === "DAI") {
+      // For stablecoins, default to 1:1
+      currentPrice = 1;
+      logger.info(`Using default price of 1 ${!isNativeToken0 ? selectedToken.symbol : "CAMP"} per ${isNativeToken0 ? selectedToken.symbol : "CAMP"}`);
+    } else {
+      // Ask for initial price
+      const initialPrice = readlineSync.question(
+        `Enter initial price (${!isNativeToken0 ? selectedToken.symbol : "CAMP"} per ${isNativeToken0 ? selectedToken.symbol : "CAMP"}, or press Enter for 1:1): `
+      );
+      
+      if (!initialPrice) {
+        currentPrice = 1;
+        logger.info("Using default price of 1:1");
+      } else if (isNaN(Number(initialPrice)) || Number(initialPrice) <= 0) {
+        logger.error("Invalid price - must be a positive number");
+        return;
+      } else {
+        currentPrice = Number(initialPrice);
+      }
     }
     
-    currentPrice = Number(initialPrice);
     currentTick = LiquidityHelpers.priceToTick(currentPrice);
+    logger.info(`Initial tick: ${currentTick}`);
   }
 
   // Set price range
@@ -238,16 +275,16 @@ async function addV3NativeLiquidity(
 
   switch (rangeIndex) {
     case 0: // Narrow
-      tickLower = currentTick - 1000;
-      tickUpper = currentTick + 1000;
+      tickLower = Math.floor(currentTick - 1000);
+      tickUpper = Math.floor(currentTick + 1000);
       break;
     case 1: // Medium
-      tickLower = currentTick - 2500;
-      tickUpper = currentTick + 2500;
+      tickLower = Math.floor(currentTick - 2500);
+      tickUpper = Math.floor(currentTick + 2500);
       break;
     case 2: // Wide
-      tickLower = currentTick - 5000;
-      tickUpper = currentTick + 5000;
+      tickLower = Math.floor(currentTick - 5000);
+      tickUpper = Math.floor(currentTick + 5000);
       break;
     case 3: // Full range
       tickLower = -887220;
@@ -300,10 +337,54 @@ async function addV3NativeLiquidity(
   }
 
   // Calculate token amount based on current price and range
-  // This is simplified - actual calculation depends on position within range
-  const tokenAmount = isNativeToken0 
-    ? nativeAmount / BigInt(Math.floor(currentPrice * 1000)) * 1000n
-    : nativeAmount * BigInt(Math.floor(currentPrice * 1000)) / 1000n;
+  // Simplified calculation for V3 concentrated liquidity
+  let tokenAmount: bigint;
+  
+  // Check if price is in range
+  const inRange = currentTick >= tickLower && currentTick < tickUpper;
+  
+  if (!inRange) {
+    if (currentTick < tickLower) {
+      // Below range: only need token1 (higher value token)
+      if (isNativeToken0) {
+        logger.warn("⚠️ Price is below your range. You'll only provide " + selectedToken.symbol);
+        // Calculate equivalent value in other token
+        tokenAmount = parseUnits((Number(formatUnits(nativeAmount, 18)) / currentPrice).toString(), selectedToken.decimals);
+      } else {
+        logger.info("✅ Price is below your range. You'll only provide CAMP");
+        tokenAmount = 0n;
+      }
+    } else {
+      // Above range: only need token0 (lower value token)  
+      if (isNativeToken0) {
+        logger.info("✅ Price is above your range. You'll only provide CAMP");
+        tokenAmount = 0n;
+      } else {
+        logger.warn("⚠️ Price is above your range. You'll only provide " + selectedToken.symbol);
+        // Calculate equivalent value in other token
+        tokenAmount = parseUnits((Number(formatUnits(nativeAmount, 18)) * currentPrice).toString(), selectedToken.decimals);
+      }
+    }
+  } else {
+    // In range: need both tokens proportionally
+    logger.info("✅ Price is within your selected range");
+    
+    // Simple approximation: use current price ratio
+    // In reality, V3 math is more complex but this gives a reasonable estimate
+    if (isNativeToken0) {
+      // CAMP is token0, calculate token1 amount
+      // currentPrice = token0/token1, so token1 = token0 * currentPrice
+      const nativeAmountInEther = Number(formatUnits(nativeAmount, 18));
+      const token1AmountInEther = nativeAmountInEther * currentPrice;
+      tokenAmount = parseUnits(token1AmountInEther.toFixed(selectedToken.decimals), selectedToken.decimals);
+    } else {
+      // CAMP is token1, calculate token0 amount
+      // currentPrice = token0/token1, so token0 = token1 / currentPrice
+      const nativeAmountInEther = Number(formatUnits(nativeAmount, 18));
+      const token0AmountInEther = nativeAmountInEther / currentPrice;
+      tokenAmount = parseUnits(token0AmountInEther.toFixed(selectedToken.decimals), selectedToken.decimals);
+    }
+  }
 
   const tokenAmountFormatted = formatUnits(tokenAmount, selectedToken.decimals);
   logger.info(`\n📊 Estimated ${selectedToken.symbol} needed: ${tokenAmountFormatted}`);
@@ -352,7 +433,7 @@ async function addV3NativeLiquidity(
     );
     
     const createPoolData = encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "createAndInitializePoolIfNecessary",
       args: [token0, token1, selectedFeeTier.fee, sqrtPriceX96],
     });
@@ -389,7 +470,7 @@ async function addV3NativeLiquidity(
     
     multicallData.push(
       encodeFunctionData({
-        abi: ABIS.NFT_POSITION_MANAGER,
+        abi: NFT_POSITION_MANAGER_ABI,
         functionName: "createAndInitializePoolIfNecessary",
         args: [token0, token1, selectedFeeTier.fee, sqrtPriceX96],
       })
@@ -399,7 +480,7 @@ async function addV3NativeLiquidity(
   // Add mint call
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "mint",
       args: [mintParams],
     })
@@ -408,14 +489,14 @@ async function addV3NativeLiquidity(
   // Add refund call for any excess native token
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "refundETH",
     })
   );
 
   const txHash = await walletClient.writeContract({
     address: CONTRACTS.NFT_POSITION_MANAGER,
-    abi: ABIS.NFT_POSITION_MANAGER,
+    abi: NFT_POSITION_MANAGER_ABI,
     functionName: "multicall",
     args: [multicallData],
     value: nativeAmount, // Send native CAMP
@@ -538,7 +619,7 @@ async function removeV3NativeLiquidity(
   // Decrease liquidity
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "decreaseLiquidity",
       args: [{
         tokenId: selectedPosition.tokenId,
@@ -553,7 +634,7 @@ async function removeV3NativeLiquidity(
   // Collect tokens
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "collect",
       args: [{
         tokenId: selectedPosition.tokenId,
@@ -567,7 +648,7 @@ async function removeV3NativeLiquidity(
   // Unwrap WCAMP to native
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "unwrapWETH9",
       args: [0n, userAddress], // Unwrap all and send to user
     })
@@ -580,7 +661,7 @@ async function removeV3NativeLiquidity(
     
   multicallData.push(
     encodeFunctionData({
-      abi: ABIS.NFT_POSITION_MANAGER,
+      abi: NFT_POSITION_MANAGER_ABI,
       functionName: "sweepToken",
       args: [otherToken, 0n, userAddress],
     })
@@ -588,7 +669,7 @@ async function removeV3NativeLiquidity(
   
   const txHash = await walletClient.writeContract({
     address: CONTRACTS.NFT_POSITION_MANAGER,
-    abi: ABIS.NFT_POSITION_MANAGER,
+    abi: NFT_POSITION_MANAGER_ABI,
     functionName: "multicall",
     args: [multicallData],
   });
@@ -676,7 +757,7 @@ async function collectV3Fees(
   for (const pos of positionsWithFees) {
     multicallData.push(
       encodeFunctionData({
-        abi: ABIS.NFT_POSITION_MANAGER,
+        abi: NFT_POSITION_MANAGER_ABI,
         functionName: "collect",
         args: [{
           tokenId: pos.tokenId,
@@ -690,7 +771,7 @@ async function collectV3Fees(
   
   const txHash = await walletClient.writeContract({
     address: CONTRACTS.NFT_POSITION_MANAGER,
-    abi: ABIS.NFT_POSITION_MANAGER,
+    abi: NFT_POSITION_MANAGER_ABI,
     functionName: "multicall",
     args: [multicallData],
   });

@@ -38,6 +38,7 @@
     "mainnet:swap:erc20-to-native-multicall": "tsx src/erc20-to-native-multicall-mainnet.ts",
     "mainnet:swap:erc20-to-native-swap": "tsx src/erc20-to-native-swap-mainnet.ts",
     "mainnet:swap:native-to-erc20-swap": "tsx src/native-to-erc20-swap-mainnet.ts",
+    "mainnet:liquidity:add-v2": "tsx src/liquidity/add-liquidity-v2-mainnet.ts",
     "mainnet:liquidity:add-v3": "tsx src/liquidity/add-liquidity-v3-mainnet.ts",
     "mainnet:liquidity:add-v3-simple": "tsx src/liquidity/add-liquidity-v3-simple-mainnet.ts",
     "mainnet:liquidity:remove-v3": "tsx src/mainnet/liquidity/remove-liquidity-v3.ts"

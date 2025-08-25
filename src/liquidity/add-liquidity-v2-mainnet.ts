@@ -12,12 +12,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  basecampTestnet,
-  baseCampTestnetTokens,
   V2_FACTORY_ADDRESS,
   V2_ROUTER_ADDRESS,
   WCAMP_ADDRESS,
-} from "../config/base-testnet";
+  campMainnet,
+  campMainnetTokens,
+} from "../config/camp-mainnet";
 import { logger } from "../utils/logger";
 import { approveTokenWithWait } from "../utils/transaction-helpers";
 
@@ -185,28 +185,21 @@ async function main() {
   const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   logger.info(`Wallet address: ${account.address}`);
 
   try {
     // Get available tokens
-    const tokens = [
-      baseCampTestnetTokens.wcamp,
-      baseCampTestnetTokens.usdc,
-      baseCampTestnetTokens.usdt,
-      baseCampTestnetTokens.dai,
-      baseCampTestnetTokens.weth,
-      baseCampTestnetTokens.wbtc,
-    ];
+    const tokens = [campMainnetTokens.wcamp, campMainnetTokens.usdc];
 
     // Get token balances
     logger.info("\n📊 Available tokens:");

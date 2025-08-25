@@ -9,26 +9,26 @@ importers:
   .:
     dependencies:
       '@summitx/chains':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.1.1
+        version: 0.1.1
       '@summitx/multicall':
-        specifier: 3.2.2
-        version: 3.2.2(typescript@5.9.2)(zod@3.25.76)
+        specifier: 3.2.3
+        version: 3.2.3(typescript@5.9.2)(zod@3.25.76)
       '@summitx/sdk':
-        specifier: 5.7.2
-        version: 5.7.2(typescript@5.9.2)(zod@3.25.76)
+        specifier: 5.7.3
+        version: 5.7.3(typescript@5.9.2)(zod@3.25.76)
       '@summitx/smart-router':
-        specifier: 4.9.3
-        version: 4.9.3(typescript@5.9.2)
+        specifier: 4.9.4
+        version: 4.9.4(typescript@5.9.2)
       '@summitx/swap-sdk-core':
-        specifier: 1.0.3
-        version: 1.0.3
+        specifier: 1.0.4
+        version: 1.0.4
       '@summitx/tokens':
-        specifier: 0.5.2
-        version: 0.5.2(typescript@5.9.2)(zod@3.25.76)
+        specifier: 0.5.3
+        version: 0.5.3(typescript@5.9.2)(zod@3.25.76)
       '@summitx/v3-sdk':
-        specifier: 3.5.3
-        version: 3.5.3(typescript@5.9.2)(zod@3.25.76)
+        specifier: 3.5.4
+        version: 3.5.4(typescript@5.9.2)(zod@3.25.76)
       chalk:
         specifier: ^5.3.0
         version: 5.6.0
@@ -434,26 +434,30 @@ packages:
   '@scure/bip39@1.2.1':
     resolution: {integrity: sha512-Z3/Fsz1yr904dduJD0NpiyRHhRYHdcnyh73FZWiV+/qhWi83wNJ3NWolYqCEN+ZWsUz2TWwajJggcRE9r1zUYg==}
 
-  '@summitx/chains@0.1.0':
-    resolution: {integrity: sha512-pEOKW1GugPicE0pR8aGayW0ur0KclH2/1NY06P8LeIPwi/FHA9qFbEvMhfFzaiwvC2dkI5XuSkUjRtf/e6qxbw==}
+  '@summitx/chains@0.1.1':
+    resolution: {integrity: sha512-tZL3gUPYv/252XRS3/ZrlOSQPyyNEUQ3T7vZOMHciobk91YTPRxPoeXUhTFogwioJmZHgX6PT+GIg+AakholVQ==}
     engines: {node: '>=10'}
 
-  '@summitx/multicall@3.2.2':
-    resolution: {integrity: sha512-SeXToWH+heX7gd52bBsWbp+WiRLH0nSZI9kwc9mQgBm4sr78WIvJMfWtqqM1g9NCna4QAxeQtHRnV56RBkZeug==}
+  '@summitx/multicall@3.2.3':
+    resolution: {integrity: sha512-FKhqE1iAwCB0bBj73kTZ7fFPaeA7aLggWOw9bJnue/CBs4jcYydY5Ec5lajWMXYUFKRvWIXFV3eXR+Pr0RLMMQ==}
 
-  '@summitx/sdk@5.7.2':
-    resolution: {integrity: sha512-GO+QCDd0/hmPYOyPKudB5VMZ/IXIBqwIx1A5GnZevYHuCKrarm3FvfBFQNVnW6dMZpLhM3SMb8puw1T1hryXlA==}
+  '@summitx/sdk@5.7.3':
+    resolution: {integrity: sha512-KZ/gedIs3EIOjMen9nsIxQ1bOtdcuzG9IS7u0QYsVmHA+0TObBk0C8hWdVDIWpxenV995jsC4ZyhVS/irF5TbA==}
     engines: {node: '>=10'}
 
-  '@summitx/smart-router@4.9.3':
-    resolution: {integrity: sha512-ATVE3+iwk4SWozdhzlYZ57lnTIgV3H7/9gGVMW9perknfZIUKpxfKlfgm2kk1tl8XeX+2OeVxOp6l6YkwrwwkA==}
+  '@summitx/smart-router@4.9.4':
+    resolution: {integrity: sha512-SxL8Ddoy57DFM6Duqxus+RGMhImm7L/T0gP4EvAiaxpKVF5zPFVWYiFbMwDgPOy4D6s/xjnxo6av7tAw4dAHCw==}
 
-  '@summitx/swap-sdk-core@1.0.3':
-    resolution: {integrity: sha512-/X8AiuYOEVE74DRUh32xDgXXJYEKxYu7lHjKEVThd3OyBdaDVbcAc+PO4IjPLWtaEE7r4icgsnM6QWP3CF4LeA==}
+  '@summitx/swap-sdk-core@1.0.0':
+    resolution: {integrity: sha512-/BOT3+hSBrm3S1mQbMyWZDGDz5nxu7wXobVah3NAui73fY9SBRg/X7KOuT7SaP7/VMBKvRaBvvrIEIy5MgDUhQ==}
     engines: {node: '>=10'}
 
-  '@summitx/token-lists@0.0.9':
-    resolution: {integrity: sha512-TFNuGyljxBYeP9FoDEI081MqqsuuC5W39pNWiplpFJRs06WDIXHUyrLa6Rl8Iw9EuwBfBoOspj09Hf4WIQ2dYA==}
+  '@summitx/swap-sdk-core@1.0.4':
+    resolution: {integrity: sha512-vp8osbmqPWQRp6dXKvmKhDdLvB0T88MvB+W8vcxg/IN/Xwr/eqxdgjZNsUqxOcvewGPOaYV/We66IVAGZxMubw==}
+    engines: {node: '>=10'}
+
+  '@summitx/token-lists@0.0.8':
+    resolution: {integrity: sha512-hk11mbE0IUlbvoPF4oldI8wp3QnwhCjbf8utBhxMEV9EKqDBZ2OQhGYtQJCV254JjL/c++cumt6bOCntkMy7Pw==}
     peerDependencies:
       '@reduxjs/toolkit': ^1.9.1
       jotai: ^2.2.2
@@ -469,11 +473,11 @@ packages:
       react:
         optional: true
 
-  '@summitx/tokens@0.5.2':
-    resolution: {integrity: sha512-z1yzS7EO1Zp5hRo4N+nJxvuxQPIFe6La4DT08kx6/gocDSmLFnnEtIRQaDWR1j+t+crAUHj8jAgnybw/8nM1Ng==}
+  '@summitx/tokens@0.5.3':
+    resolution: {integrity: sha512-213LAJLTorNvDVqVNkIBw97Y6ys7Mq8CbFsDmHymngtIyttMXN5nMf5QBqJp1DD7TnYoR5ek6zaLdStPkSbrQw==}
 
-  '@summitx/v3-sdk@3.5.3':
-    resolution: {integrity: sha512-dcDSe2cLSPdeQp+r5TISE9SpSkNiB8hbib9MFMvTmYQTmVQ3kL9LIc8SII8vEo/AvaNiUIUjngxUFFNZC2Ytug==}
+  '@summitx/v3-sdk@3.5.4':
+    resolution: {integrity: sha512-59fqb8Gg+dOm1SzCxJ/EwYdOmvp1KEDpG7ibj2FzLuXSgxaSZ4syKk0jXjNefEqrVDofAK/YilUCwcX3wRWk5g==}
     engines: {node: '>=10'}
 
   '@types/body-parser@1.19.6':
@@ -1956,12 +1960,12 @@ snapshots:
       '@noble/hashes': 1.3.2
       '@scure/base': 1.1.9
 
-  '@summitx/chains@0.1.0': {}
+  '@summitx/chains@0.1.1': {}
 
-  '@summitx/multicall@3.2.2(typescript@5.9.2)(zod@3.25.76)':
+  '@summitx/multicall@3.2.3(typescript@5.9.2)(zod@3.25.76)':
     dependencies:
-      '@summitx/chains': 0.1.0
-      '@summitx/sdk': 5.7.2(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/chains': 0.1.1
+      '@summitx/sdk': 5.7.3(typescript@5.9.2)(zod@3.25.76)
       viem: 1.15.1(typescript@5.9.2)(zod@3.25.76)
     transitivePeerDependencies:
       - bufferutil
@@ -1969,10 +1973,10 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@summitx/sdk@5.7.2(typescript@5.9.2)(zod@3.25.76)':
+  '@summitx/sdk@5.7.3(typescript@5.9.2)(zod@3.25.76)':
     dependencies:
-      '@summitx/chains': 0.1.0
-      '@summitx/swap-sdk-core': 1.0.3
+      '@summitx/chains': 0.1.1
+      '@summitx/swap-sdk-core': 1.0.4
       big.js: 5.2.2
       decimal.js-light: 2.5.1
       tiny-invariant: 1.3.3
@@ -1985,15 +1989,15 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@summitx/smart-router@4.9.3(typescript@5.9.2)':
+  '@summitx/smart-router@4.9.4(typescript@5.9.2)':
     dependencies:
-      '@summitx/chains': 0.1.0
-      '@summitx/multicall': 3.2.2(typescript@5.9.2)(zod@3.25.76)
-      '@summitx/sdk': 5.7.2(typescript@5.9.2)(zod@3.25.76)
-      '@summitx/swap-sdk-core': 1.0.3
-      '@summitx/token-lists': 0.0.9
-      '@summitx/tokens': 0.5.2(typescript@5.9.2)(zod@3.25.76)
-      '@summitx/v3-sdk': 3.5.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/chains': 0.1.1
+      '@summitx/multicall': 3.2.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/sdk': 5.7.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/swap-sdk-core': 1.0.4
+      '@summitx/token-lists': 0.0.8
+      '@summitx/tokens': 0.5.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/v3-sdk': 3.5.4(typescript@5.9.2)(zod@3.25.76)
       async-retry: 1.3.3
       debug: 4.4.1
       graphql: 16.11.0
@@ -2015,7 +2019,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@summitx/swap-sdk-core@1.0.3':
+  '@summitx/swap-sdk-core@1.0.0':
     dependencies:
       big.js: 5.2.2
       decimal.js-light: 2.5.1
@@ -2023,17 +2027,25 @@ snapshots:
       tiny-warning: 1.0.3
       toformat: 2.0.0
 
-  '@summitx/token-lists@0.0.9':
+  '@summitx/swap-sdk-core@1.0.4':
     dependencies:
-      '@summitx/swap-sdk-core': 1.0.3
+      big.js: 5.2.2
+      decimal.js-light: 2.5.1
+      tiny-invariant: 1.3.3
+      tiny-warning: 1.0.3
+      toformat: 2.0.0
+
+  '@summitx/token-lists@0.0.8':
+    dependencies:
+      '@summitx/swap-sdk-core': 1.0.0
       ajv: 6.12.6
       lodash: 4.17.21
 
-  '@summitx/tokens@0.5.2(typescript@5.9.2)(zod@3.25.76)':
+  '@summitx/tokens@0.5.3(typescript@5.9.2)(zod@3.25.76)':
     dependencies:
-      '@summitx/chains': 0.1.0
-      '@summitx/sdk': 5.7.2(typescript@5.9.2)(zod@3.25.76)
-      '@summitx/token-lists': 0.0.9
+      '@summitx/chains': 0.1.1
+      '@summitx/sdk': 5.7.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/token-lists': 0.0.8
     transitivePeerDependencies:
       - '@reduxjs/toolkit'
       - bufferutil
@@ -2044,12 +2056,12 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@summitx/v3-sdk@3.5.3(typescript@5.9.2)(zod@3.25.76)':
+  '@summitx/v3-sdk@3.5.4(typescript@5.9.2)(zod@3.25.76)':
     dependencies:
-      '@summitx/chains': 0.1.0
-      '@summitx/sdk': 5.7.2(typescript@5.9.2)(zod@3.25.76)
-      '@summitx/swap-sdk-core': 1.0.3
-      '@summitx/tokens': 0.5.2(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/chains': 0.1.1
+      '@summitx/sdk': 5.7.3(typescript@5.9.2)(zod@3.25.76)
+      '@summitx/swap-sdk-core': 1.0.4
+      '@summitx/tokens': 0.5.3(typescript@5.9.2)(zod@3.25.76)
       '@uniswap/v3-staker': 1.0.0
       big.js: 5.2.2
       decimal.js-light: 2.5.1

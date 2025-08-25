@@ -12,11 +12,11 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  basecampTestnet,
-  baseCampTestnetTokens,
+  campMainnet,
+  campMainnetTokens,
   SMART_ROUTER_ADDRESS,
-} from "./config/base-testnet";
-import { TokenQuoter } from "./quoter/token-quoter";
+} from "./config/camp-mainnet";
+import { TokenQuoter } from "./quoter/token-quoter-mainnet";
 import { logger } from "./utils/logger";
 import {
   approveTokenWithWait,
@@ -160,21 +160,21 @@ async function main() {
   const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   logger.info(`Wallet address: ${account.address}`);
 
   // Initialize quoter
   const quoter = new TokenQuoter({
-    rpcUrl: basecampTestnet.rpcUrls.default.http[0],
+    rpcUrl: campMainnet.rpcUrls.default.http[0],
     slippageTolerance: 1.0,
     maxHops: 2,
     maxSplits: 2,
@@ -188,13 +188,7 @@ async function main() {
 
     // Display all token balances
     logger.info("Checking token balances...");
-    const tokens = [
-      baseCampTestnetTokens.usdc,
-      baseCampTestnetTokens.usdt,
-      baseCampTestnetTokens.dai,
-      baseCampTestnetTokens.weth,
-      baseCampTestnetTokens.wbtc,
-    ];
+    const tokens = [campMainnetTokens.usdc, campMainnetTokens.wcamp];
 
     for (const token of tokens) {
       const balance = await publicClient.readContract({
@@ -209,35 +203,17 @@ async function main() {
     // Example swaps
     const swaps = [
       {
-        input: baseCampTestnetTokens.usdc,
-        output: baseCampTestnetTokens.usdt,
-        amount: "1",
-        description: "USDC → USDT (Stablecoin swap)",
+        input: campMainnetTokens.usdc,
+        output: campMainnetTokens.wcamp,
+        amount: "0.001",
+        description: "USDC → WCAMP",
       },
-      // {
-      //   input: baseCampTestnetTokens.usdt,
-      //   output: baseCampTestnetTokens.dai,
-      //   amount: "1",
-      //   description: "USDT → DAI (Stablecoin swap)",
-      // },
-      // {
-      //   input: baseCampTestnetTokens.usdc,
-      //   output: baseCampTestnetTokens.weth,
-      //   amount: "1",
-      //   description: "USDC → WETH",
-      // },
-      // {
-      //   input: baseCampTestnetTokens.weth,
-      //   output: baseCampTestnetTokens.wbtc,
-      //   amount: "0.001",
-      //   description: "WETH → WBTC",
-      // },
-      // {
-      //   input: baseCampTestnetTokens.dai,
-      //   output: baseCampTestnetTokens.usdc,
-      //   amount: "1",
-      //   description: "DAI → USDC (Reverse stablecoin swap)",
-      // },
+      {
+        input: campMainnetTokens.wcamp,
+        output: campMainnetTokens.usdc,
+        amount: "0.001",
+        description: "WCAMP → USDC",
+      },
     ];
 
     let successCount = 0;

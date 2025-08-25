@@ -13,6 +13,9 @@
       "Bash(grep:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\Shree\\code\\techyon\\summitx"
+    ]
   }
 }

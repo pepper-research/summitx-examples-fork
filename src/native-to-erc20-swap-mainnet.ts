@@ -12,11 +12,11 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  basecampTestnet,
-  baseCampTestnetTokens,
+  campMainnet,
+  campMainnetTokens,
   SMART_ROUTER_ADDRESS,
-} from "./config/base-testnet";
-import { TokenQuoter } from "./quoter/token-quoter";
+} from "./config/camp-mainnet";
+import { TokenQuoter } from "./quoter/token-quoter-mainnet";
 import { logger } from "./utils/logger";
 
 config();
@@ -39,14 +39,14 @@ async function main() {
   const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   logger.info(`Wallet address: ${account.address}`);
@@ -64,7 +64,7 @@ async function main() {
 
   // Initialize quoter
   const quoter = new TokenQuoter({
-    rpcUrl: basecampTestnet.rpcUrls.default.http[0],
+    rpcUrl: campMainnet.rpcUrls.default.http[0],
     slippageTolerance: 1.0,
     maxHops: 2,
     maxSplits: 2,
@@ -83,8 +83,8 @@ async function main() {
 
     // Get quote
     const quote = await quoter.getQuote(
-      baseCampTestnetTokens.wcamp, // Use WCAMP for native
-      baseCampTestnetTokens.usdc,
+      campMainnetTokens.wcamp, // Use WCAMP for native
+      campMainnetTokens.usdc,
       swapAmount,
       TradeType.EXACT_INPUT,
       false
@@ -137,7 +137,7 @@ async function main() {
 
       // Check USDC balance
       const usdcBalance = await publicClient.readContract({
-        address: baseCampTestnetTokens.usdc.address as Address,
+        address: campMainnetTokens.usdc.address as Address,
         abi: [
           {
             name: "balanceOf",

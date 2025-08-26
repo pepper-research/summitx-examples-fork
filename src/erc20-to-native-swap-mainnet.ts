@@ -12,12 +12,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  basecampTestnet,
-  baseCampTestnetTokens,
+  campMainnet,
+  campMainnetTokens,
   SMART_ROUTER_ADDRESS,
   WCAMP_ADDRESS,
-} from "./config/base-testnet";
-import { TokenQuoter } from "./quoter/token-quoter";
+} from "./config/camp-mainnet";
+import { TokenQuoter } from "./quoter/token-quoter-mainnet";
 import { logger } from "./utils/logger";
 import {
   approveTokenWithWait,
@@ -50,21 +50,21 @@ async function main() {
   const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   logger.info(`Wallet address: ${account.address}`);
 
   // Check USDC balance
   const usdcBalance = await publicClient.readContract({
-    address: baseCampTestnetTokens.usdc.address as Address,
+    address: campMainnetTokens.usdc.address as Address,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [account.address],
@@ -79,7 +79,7 @@ async function main() {
 
   // Initialize quoter
   const quoter = new TokenQuoter({
-    rpcUrl: basecampTestnet.rpcUrls.default.http[0],
+    rpcUrl: campMainnet.rpcUrls.default.http[0],
     slippageTolerance: 1.0,
     maxHops: 2,
     maxSplits: 2,
@@ -98,8 +98,8 @@ async function main() {
 
     // Get quote - first get to WCAMP, then we'll unwrap
     const quote = await quoter.getQuote(
-      baseCampTestnetTokens.usdc,
-      baseCampTestnetTokens.wcamp,
+      campMainnetTokens.usdc,
+      campMainnetTokens.wcamp,
       swapAmount,
       TradeType.EXACT_INPUT,
       false
@@ -129,7 +129,7 @@ async function main() {
     await approveTokenWithWait(
       walletClient,
       publicClient,
-      baseCampTestnetTokens.usdc.address as Address,
+      campMainnetTokens.usdc.address as Address,
       SMART_ROUTER_ADDRESS as Address,
       parseUnits(swapAmount, 6),
       "USDC",
@@ -179,7 +179,7 @@ async function main() {
         args: [account.address],
       }),
       publicClient.readContract({
-        address: baseCampTestnetTokens.usdc.address as Address,
+        address: campMainnetTokens.usdc.address as Address,
         abi: ERC20_ABI,
         functionName: "balanceOf",
         args: [account.address],

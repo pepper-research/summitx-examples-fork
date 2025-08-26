@@ -7,9 +7,15 @@
       "Bash(npx tsx:*)",
       "Bash(npm run:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(npx pnpm liquidity:add-v3:*)",
+      "Bash(npx pnpm:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\Shree\\code\\techyon\\summitx"
+    ]
   }
 }

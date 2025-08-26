@@ -9,7 +9,7 @@ import {
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { WCAMP_ADDRESS, basecampTestnet } from "./config/base-testnet";
+import { campMainnet, WCAMP_ADDRESS } from "./config/camp-mainnet";
 import { logger } from "./utils/logger";
 
 config();
@@ -56,14 +56,14 @@ async function main() {
   const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: basecampTestnet,
-    transport: http(basecampTestnet.rpcUrls.default.http[0]),
+    chain: campMainnet,
+    transport: http(campMainnet.rpcUrls.default.http[0]),
   });
 
   logger.info(`Wallet address: ${account.address}`);

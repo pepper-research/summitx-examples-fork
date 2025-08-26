@@ -6,6 +6,8 @@ A comprehensive suite of examples for interacting with the SummitX DEX on Base C
 
 - **Token Swapping**: Native to ERC20, ERC20 to Native, and ERC20 to ERC20 swaps
 - **Multicall Support**: Combine swap + unwrap operations in a single transaction
+- **Liquidity Management**: Add/remove liquidity for V2 AMM and V3 concentrated pools
+- **Position Tracking**: View and manage all liquidity positions across protocols
 - **Wrap/Unwrap**: Convert between native CAMP and wrapped WCAMP tokens
 - **Smart Routing**: Automatic route finding across V3 and Stable pools
 - **Quote System**: Real-time quotes with price impact and slippage calculations
@@ -43,18 +45,28 @@ cp .env.example .env
 src/
 ├── archive/                   # Archived/unused files
 ├── config/                    # Chain and token configurations
-│   └── base-testnet.ts        # Base Camp testnet config
+│   ├── base-testnet.ts        # Base Camp testnet config
+│   ├── contracts.ts           # Centralized contract addresses
+│   └── abis.ts                # Standard ABI definitions
 ├── debug/                     # Debug utilities
 │   ├── check-balance.ts       # Check wallet balances
 │   ├── debug-gas.ts           # Gas estimation debugging
 │   ├── debug-swap.ts          # Swap parameter debugging
 │   ├── quote-example.ts       # Quote testing
 │   └── verify-calldata.ts     # Verify swap calldata
+├── liquidity/                 # Liquidity management
+│   ├── add-liquidity-v2.ts    # Add liquidity to V2 AMM pools
+│   ├── remove-liquidity-v2.ts # Remove liquidity from V2 pools
+│   ├── add-liquidity-v3.ts    # Add concentrated liquidity (V3)
+│   ├── manage-positions.ts    # View and manage all positions
+│   ├── native-liquidity.ts    # Native CAMP V2 liquidity operations
+│   └── native-liquidity-v3.ts # Native CAMP V3 concentrated liquidity
 ├── quoter/                    # Token quoter implementation
 │   └── token-quoter.ts        # Main quoter class
 ├── utils/                     # Helper utilities
 │   ├── logger.ts              # Logging utility
-│   └── quote-to-trade-converter.ts # Convert quotes to trades
+│   ├── quote-to-trade-converter.ts # Convert quotes to trades
+│   └── liquidity-helpers.ts   # Reusable liquidity utilities
 ├── index.ts                   # Main entry point (runs all examples)
 ├── native-to-erc20-swap.ts    # Native CAMP to ERC20 swap
 ├── erc20-to-native-swap.ts    # ERC20 to native CAMP swap (with unwrap)
@@ -89,30 +101,41 @@ npm run wrap-unwrap            # Convert CAMP ↔ WCAMP
 
 ### Main Commands
 
-| Command                         | Description                                        |
-| ------------------------------- | -------------------------------------------------- |
-| `npm start`                     | Run all examples (wrap/unwrap + all swap types)   |
-| `npm run dev`                   | Same as npm start                                 |
-| `npm run wrap-unwrap`           | Run wrap/unwrap CAMP ↔ WCAMP example              |
-| `npm run check:balance`         | Check wallet token balances                        |
+| Command                 | Description                                     |
+| ----------------------- | ----------------------------------------------- |
+| `npm start`             | Run all examples (wrap/unwrap + all swap types) |
+| `npm run dev`           | Same as npm start                               |
+| `npm run wrap-unwrap`   | Run wrap/unwrap CAMP ↔ WCAMP example            |
+| `npm run check:balance` | Check wallet token balances                     |
 
 ### Swap Commands
 
-| Command                         | Description                                        |
-| ------------------------------- | -------------------------------------------------- |
-| `npm run swap:all`              | Run legacy comprehensive swap examples            |
-| `npm run swap:native-to-erc20` | Swap native CAMP to USDC                          |
-| `npm run swap:erc20-to-native` | Swap USDC to native CAMP (includes unwrap)        |
-| `npm run swap:erc20-to-native-multicall` | ERC20 to native in single transaction    |
-| `npm run swap:erc20-to-erc20`  | Run multiple ERC20 to ERC20 swaps                 |
+| Command                                  | Description                                |
+| ---------------------------------------- | ------------------------------------------ |
+| `npm run swap:all`                       | Run legacy comprehensive swap examples     |
+| `npm run swap:native-to-erc20`           | Swap native CAMP to USDC                   |
+| `npm run swap:erc20-to-native`           | Swap USDC to native CAMP (includes unwrap) |
+| `npm run swap:erc20-to-native-multicall` | ERC20 to native in single transaction      |
+| `npm run swap:erc20-to-erc20`            | Run multiple ERC20 to ERC20 swaps          |
+
+### Liquidity Commands
+
+| Command                       | Description                             |
+| ----------------------------- | --------------------------------------- |
+| `npm run liquidity:add-v2`    | Add liquidity to V2 AMM pools           |
+| `npm run liquidity:remove-v2` | Remove liquidity from V2 pools          |
+| `npm run liquidity:add-v3`    | Add concentrated liquidity to V3 pools  |
+| `npm run liquidity:manage`    | View and manage all liquidity positions |
+| `npm run liquidity:native`    | Native CAMP V2 liquidity management     |
+| `npm run liquidity:native-v3` | Native CAMP V3 concentrated liquidity   |
 
 ### Debug Commands
 
-| Command                  | Description                       |
-| ------------------------ | --------------------------------- |
-| `npm run quote`          | Test quoter functionality         |
-| `npm run debug:gas`      | Debug gas estimation issues       |
-| `npm run debug:verify`   | Verify swap calldata generation  |
+| Command                | Description                     |
+| ---------------------- | ------------------------------- |
+| `npm run quote`        | Test quoter functionality       |
+| `npm run debug:gas`    | Debug gas estimation issues     |
+| `npm run debug:verify` | Verify swap calldata generation |
 
 ## 💱 Supported Tokens
 
@@ -249,6 +272,142 @@ const unwrapHash = await walletClient.writeContract({
 });
 ```
 
+## 💧 Liquidity Management
+
+### Add Liquidity V2 (AMM)
+
+```typescript
+// Interactive token selection and optimal amount calculation
+const { amountBOptimal } = await calculateOptimalAmounts(
+  publicClient,
+  tokenA.address,
+  tokenB.address,
+  amountA,
+  decimalsA,
+  decimalsB
+);
+
+// Add liquidity with slippage protection
+await walletClient.writeContract({
+  address: V2_ROUTER_ADDRESS,
+  abi: V2_ROUTER_ABI,
+  functionName: "addLiquidity",
+  args: [
+    tokenA.address,
+    tokenB.address,
+    amountA,
+    amountB,
+    amountAMin, // With 0.5% slippage
+    amountBMin,
+    recipient,
+    deadline,
+  ],
+});
+```
+
+### Add Liquidity V3 (Concentrated)
+
+```typescript
+// Set price range with tick spacing
+const tickLower = getNearestUsableTick(currentTick - 2500, tickSpacing);
+const tickUpper = getNearestUsableTick(currentTick + 2500, tickSpacing);
+
+// Mint NFT position
+await walletClient.writeContract({
+  address: NFT_POSITION_MANAGER,
+  abi: NFT_POSITION_MANAGER_ABI,
+  functionName: "mint",
+  args: [
+    {
+      token0,
+      token1,
+      fee: 3000, // 0.3% fee tier
+      tickLower,
+      tickUpper,
+      amount0Desired,
+      amount1Desired,
+      amount0Min,
+      amount1Min,
+      recipient,
+      deadline,
+    },
+  ],
+});
+```
+
+### Remove Liquidity
+
+```typescript
+// V2: Remove with percentage selection (25%, 50%, 75%, 100%)
+await walletClient.writeContract({
+  address: V2_ROUTER_ADDRESS,
+  abi: V2_ROUTER_ABI,
+  functionName: "removeLiquidity",
+  args: [token0, token1, lpAmount, amount0Min, amount1Min, recipient, deadline],
+});
+
+// V3: Decrease liquidity from NFT position
+await walletClient.writeContract({
+  address: NFT_POSITION_MANAGER,
+  abi: NFT_POSITION_MANAGER_ABI,
+  functionName: "decreaseLiquidity",
+  args: [{ tokenId, liquidity, amount0Min, amount1Min, deadline }],
+});
+```
+
+### Position Management
+
+The examples include comprehensive position tracking:
+
+- **V2 Positions**: LP token balances, pool shares, underlying token amounts
+- **V3 Positions**: NFT IDs, price ranges, in/out of range status, unclaimed fees
+- **Interactive Management**: Add, remove, or view position details
+- **Portfolio Overview**: Total positions across protocols
+
+### Native CAMP Liquidity
+
+Direct native CAMP liquidity operations without manual wrapping:
+
+```typescript
+// Add liquidity with native CAMP
+await walletClient.writeContract({
+  address: V2_ROUTER_ADDRESS,
+  abi: V2_ROUTER_ABI,
+  functionName: "addLiquidityETH",
+  args: [
+    tokenAddress,     // ERC20 token to pair with
+    tokenAmount,      // Amount of token
+    tokenAmountMin,   // Min token (slippage)
+    nativeAmountMin,  // Min CAMP (slippage)
+    recipient,
+    deadline,
+  ],
+  value: nativeCAMPAmount, // Native CAMP value
+});
+
+// Remove liquidity to receive native CAMP
+await walletClient.writeContract({
+  address: V2_ROUTER_ADDRESS,
+  abi: V2_ROUTER_ABI,
+  functionName: "removeLiquidityETH",
+  args: [
+    tokenAddress,
+    lpTokenAmount,
+    tokenAmountMin,
+    campAmountMin,
+    recipient,
+    deadline,
+  ],
+});
+```
+
+Features:
+- **Interactive CLI**: Choose between add, remove, or view positions
+- **Auto-detection**: Finds all native CAMP positions
+- **Optimal Ratios**: Calculates optimal amounts for existing pools
+- **Gas Management**: Reserves CAMP for transaction fees
+- **Direct Native**: No manual WCAMP wrapping needed
+
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -360,13 +519,22 @@ The main class for getting swap quotes:
 ## 🎯 Key Features & Fixes
 
 ### New Features
+
 1. **Separated Swap Examples**: Individual files for each swap type (native-to-erc20, erc20-to-native, erc20-to-erc20)
 2. **Automatic Unwrapping**: ERC20 to native swaps automatically unwrap WCAMP to native CAMP
 3. **Multicall Implementation**: Single-transaction swap + unwrap using router multicall functionality
-4. **Comprehensive Logging**: Detailed balance tracking and transaction status reporting
-5. **Multiple Token Support**: Swaps between USDC, USDT, DAI, WETH, WBTC, and native CAMP
+4. **Comprehensive Liquidity Management**:
+   - V2 AMM pool liquidity provision with optimal ratio calculation
+   - V3 concentrated liquidity with customizable price ranges
+   - Interactive position management and tracking
+   - Support for native CAMP in liquidity operations
+5. **Position Portfolio**: View all V2 and V3 positions in one place
+6. **Dynamic Fee Tiers**: Support for 0.01%, 0.05%, 0.3%, and 1% fee tiers in V3
+7. **Comprehensive Logging**: Detailed balance tracking and transaction status reporting
+8. **Multiple Token Support**: Swaps between USDC, USDT, DAI, WETH, WBTC, and native CAMP
 
 ### Key Fixes Implemented
+
 1. **Quote System**: Updated to match reference implementation with proper decimal handling
 2. **Native Swaps**: Fixed by manually setting transaction value for native CAMP
 3. **Router Address**: Fixed contract creation issue by explicitly setting router address

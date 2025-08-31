@@ -205,6 +205,12 @@ export const QUOTER_V2_ABI = parseAbi([
   "function quoteExactOutputSingle((address tokenIn, address tokenOut, uint256 amount, uint24 fee, uint160 sqrtPriceLimitX96)) returns (uint256 amountIn, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
 ]);
 
+// Spice Flow Delegate ABI
+export const DELEGATE_ABI = parseAbi([
+  "function execute((bytes signature, (bytes32 hash, uint256 chainId, (address to, uint256 value, bytes data)[] calls, uint256 recentBlock)[] chainBatches) intent) payable",
+  "function selfExecute((address to, uint256 value, bytes data)[] calls) payable",
+]);
+
 // Export all ABIs as a single object for convenience
 export const ABIS = {
   ERC20: ERC20_ABI,

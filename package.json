@@ -57,7 +57,7 @@
     "express": "^4.18.2",
     "graphql-request": "^5.0.0",
     "readline-sync": "^1.4.10",
-    "viem": "1.15.1"
+    "viem": "2.35.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

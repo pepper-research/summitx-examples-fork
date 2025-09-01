@@ -112,19 +112,19 @@ async function main() {
           data: "0x",
         }
       ]
-    }
+    },
     // solver on baseCampTestnet sends CAMP to user
-    // {
-    //   chainId: basecampTestnet.id,
-    //   recentBlock: recentBlockBaseCamp,
-    //   calls: [
-    //     {
-    //       to: user.address,
-    //       value: depositAmount,
-    //       data: "0x",
-    //     }
-    //   ]
-    // }
+    {
+      chainId: basecampTestnet.id,
+      recentBlock: recentBlockBaseCamp,
+      calls: [
+        {
+          to: user.address,
+          value: depositAmount,
+          data: "0x",
+        }
+      ]
+    }
   ]);
 
   const digest = getIntentHash(chainBatches);
@@ -171,26 +171,21 @@ async function main() {
     account: solver,
     functionName: "selfExecute",
     args: [
-      // [{
-      //   to: user.address,
-      //   data: encodeFunctionData({
-      //     abi: DELEGATE_ABI,
-      //     functionName: "execute",
-      //     args: [
-      //       {
-      //         signature: signature,
-      //         chainBatches: selectChainForChainBatches(chainBatches, {
-      //           chainId: BigInt(basecampTestnet.id)
-      //         }),
-      //       }
-      //     ]
-      //   }),
-      //   value: 0n
-      // }]
       [{
         to: user.address,
-        value: depositAmount,
-        data: "0x",
+        data: encodeFunctionData({
+          abi: DELEGATE_ABI,
+          functionName: "execute",
+          args: [
+            {
+              signature: signature,
+              chainBatches: selectChainForChainBatches(chainBatches, {
+                chainId: BigInt(basecampTestnet.id)
+              }),
+            }
+          ]
+        }),
+        value: 0n
       }]
     ]
   }) as Hash;

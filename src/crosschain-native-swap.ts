@@ -10,7 +10,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia, basecampTestnet } from "viem/chains";
 import { SEPOLIA_DELEGATE, BASECAMP_DELEGATE } from "./config/contracts";
-import { getIntentHash, hashChainBatches, selectChainForChainBatches, TxSubmitRequest } from "./utils/delegate-helpers";
+import { getIntentHash, hashChainBatches, selectChainForChainBatches } from "./utils/delegate-helpers";
 import { DELEGATE_ABI } from "./config/abis";
 
 

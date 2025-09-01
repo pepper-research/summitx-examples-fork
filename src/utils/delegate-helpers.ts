@@ -10,6 +10,8 @@ import {
     PublicClient,
     WalletClient,
 } from "viem";
+import "dotenv/config";
+import axios from "axios";
 
 export type Call =
     | never
@@ -57,14 +59,7 @@ export const ChainAuthorizationAbi = {
     ],
 } as const;
 
-// export interface Authorization {
-//     address: string;
-//     chainId: number;
-//     nonce: number;
-//     r: string;
-//     s: string;
-//     yParity: number;
-// }
+
 
 export const AuthorizationAbi: AbiParameter = {
     type: "tuple",
@@ -119,6 +114,7 @@ export interface DelegationConfig {
 }
 
 export interface TxSubmitRequest {
+    address: Address;
     authorization: Authorization[];
     intentAuthorization: {
         signature: string;
@@ -129,6 +125,8 @@ export interface TxSubmitRequest {
             recentBlock: bigint;
         }>;
     };
+    tokenAddress?: Address;
+    tokenAmount?: bigint;
 }
 
 export interface TxSubmitResponse {
@@ -169,82 +167,12 @@ export function getIntentHash(
     );
 }
 
-// export async function signDelegation(
-//   walletClient: WalletClient,
-//   address: Address,
-//   chainId: number,
-//   delegateContractAddress: Address,
-// ): Promise<Authorization> {
-//   const publicClient = getPublicClient({ chainId });
-//   const nonce = await getAccountNonce(address, publicClient);
-
-//   const domain = {
-//     name: "Authorization",
-//     version: "1",
-//     chainId: BigInt(chainId),
-//     verifyingContract: delegateContractAddress,
-//   } as const;
-
-//   const types = {
-//     Authorization: [
-//       { name: "contractAddress", type: "address" },
-//       { name: "chainId", type: "uint256" },
-//       { name: "nonce", type: "uint256" },
-//     ],
-//   } as const;
-
-//   const message = {
-//     contractAddress: delegateContractAddress,
-//     chainId: BigInt(chainId),
-//     nonce: BigInt(nonce),
-//   } as const;
-
-//   const signature = await walletClient.signTypedData({
-//     account: address,
-//     domain,
-//     types,
-//     primaryType: "Authorization",
-//     message,
-//   });
-
-//   const authorization = {
-//     address: address.toString(),
-//     chainId: Number(chainId),
-//     nonce: Number(nonce),
-//     r: signature.slice(0, 66) as `0x${string}`,
-//     s: `0x${signature.slice(66, 130)}` as `0x${string}`,
-//     yParity: parseInt(signature.slice(130, 132), 16) as 0 | 1,
-//   };
-
-//   return authorization;
-// }
-
-export async function submitTransaction(
-    request: TxSubmitRequest,
-): Promise<TxSubmitResponse> {
-    try {
-        const response = await fetch(`${process.env.TX_SUBMISSION_API}/transaction/submit`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(request, (key, value) =>
-                typeof value === 'bigint' ? value.toString() : value
-            ),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Relayer API error: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json() as TxSubmitResponse;
-        return {
-            hash: result.hash,
-            intentId: result.intentId || request.intentAuthorization.signature,
-        };
-    } catch (error) {
-        console.error('Error submitting transaction to relayer:', error);
-        throw error;
-    }
+export function selectChainForChainBatches(
+  chainBatches: ChainBatch[],
+  { chainId }: { chainId: bigint },
+): ChainBatch[] {
+  return chainBatches.map((auth) => ({
+    ...auth,
+    calls: chainId == auth.chainId ? auth.calls : [],
+  }));
 }

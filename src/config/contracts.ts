@@ -34,8 +34,8 @@ export const STABLE_SWAP_FACTORY = "0xe6DF37F17A2261E6716E8B983cB8136581d02A8f" 
 export const STABLE_SWAP_INFO = "0x30D33e1b36E4c8BDB638587e88572B6B1c1B26aa" as Address;
 
 // Spice Flow Delegeate addresses
-export const SEPOLIA_DELEGATE = "0x36d5e6b93c211b79b734b0adb3812d0c066608f9" as Address;
-export const BASECAMP_DELEGATE = "0x" as Address;
+export const SEPOLIA_DELEGATE = "0xDF7d39BB544778F467D10b08B1F5C170fd7fB480" as Address;
+export const BASECAMP_DELEGATE = "0xA15BFeD4eC0BEdd36b00b9856aFa1C6BCFE61574" as Address;
 
 // Fee tiers for V3 pools (in basis points)
 export const V3_FEE_TIERS = {

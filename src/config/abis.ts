@@ -206,10 +206,399 @@ export const QUOTER_V2_ABI = parseAbi([
 ]);
 
 // Spice Flow Delegate ABI
-export const DELEGATE_ABI = parseAbi([
-  "function execute((bytes signature, (bytes32 hash, uint256 chainId, (address to, uint256 value, bytes data)[] calls, uint256 recentBlock)[] chainBatches) intent) payable",
-  "function selfExecute((address to, uint256 value, bytes data)[] calls) payable",
-]);
+// export const DELEGATE_ABI = parseAbi([
+//   "function execute((bytes signature, (bytes32 hash, uint256 chainId, (address to, uint256 value, bytes data)[] calls, uint256 recentBlock)[] chainBatches) intent) payable",
+//   "function selfExecute((address to, uint256 value, bytes data)[] calls) payable",
+// ]);
+
+export const DELEGATE_ABI = [
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			},
+			{
+				"internalType": "bytes",
+				"name": "errorMessage",
+				"type": "bytes"
+			}
+		],
+		"name": "CallReverted",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "signatureHash",
+				"type": "bytes32"
+			}
+		],
+		"name": "DuplicateSignature",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ECDSAInvalidSignature",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "length",
+				"type": "uint256"
+			}
+		],
+		"name": "ECDSAInvalidSignatureLength",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "s",
+				"type": "bytes32"
+			}
+		],
+		"name": "ECDSAInvalidSignatureS",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "IntvalidAuthority",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "chainId",
+				"type": "uint256"
+			}
+		],
+		"name": "InvalidChainId",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "recovered",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "expected",
+				"type": "address"
+			}
+		],
+		"name": "InvalidSignature",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "SignatureExpired",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentBlock",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "recentBlock",
+				"type": "uint256"
+			}
+		],
+		"name": "TooEarly",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "block",
+				"type": "uint256"
+			},
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "value",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes",
+						"name": "data",
+						"type": "bytes"
+					}
+				],
+				"indexed": false,
+				"internalType": "struct Delegate.Call[]",
+				"name": "calls",
+				"type": "tuple[]"
+			}
+		],
+		"name": "BatchExecuted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "executor",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes",
+				"name": "returnData",
+				"type": "bytes"
+			}
+		],
+		"name": "CallExecuted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes",
+				"name": "signature",
+				"type": "bytes"
+			}
+		],
+		"name": "IntentSubmitted",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "bytes",
+						"name": "signature",
+						"type": "bytes"
+					},
+					{
+						"components": [
+							{
+								"internalType": "bytes32",
+								"name": "hash",
+								"type": "bytes32"
+							},
+							{
+								"internalType": "uint256",
+								"name": "chainId",
+								"type": "uint256"
+							},
+							{
+								"components": [
+									{
+										"internalType": "address",
+										"name": "to",
+										"type": "address"
+									},
+									{
+										"internalType": "uint256",
+										"name": "value",
+										"type": "uint256"
+									},
+									{
+										"internalType": "bytes",
+										"name": "data",
+										"type": "bytes"
+									}
+								],
+								"internalType": "struct Delegate.Call[]",
+								"name": "calls",
+								"type": "tuple[]"
+							},
+							{
+								"internalType": "uint256",
+								"name": "recentBlock",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct Delegate.ChainBatch[]",
+						"name": "chainBatches",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct Delegate.Intent",
+				"name": "intent",
+				"type": "tuple"
+			}
+		],
+		"name": "execute",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "value",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes",
+						"name": "data",
+						"type": "bytes"
+					}
+				],
+				"internalType": "struct Delegate.Call[]",
+				"name": "calls",
+				"type": "tuple[]"
+			}
+		],
+		"name": "selfExecute",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "fallback"
+	},
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "bytes",
+						"name": "signature",
+						"type": "bytes"
+					},
+					{
+						"components": [
+							{
+								"internalType": "bytes32",
+								"name": "hash",
+								"type": "bytes32"
+							},
+							{
+								"internalType": "uint256",
+								"name": "chainId",
+								"type": "uint256"
+							},
+							{
+								"components": [
+									{
+										"internalType": "address",
+										"name": "to",
+										"type": "address"
+									},
+									{
+										"internalType": "uint256",
+										"name": "value",
+										"type": "uint256"
+									},
+									{
+										"internalType": "bytes",
+										"name": "data",
+										"type": "bytes"
+									}
+								],
+								"internalType": "struct Delegate.Call[]",
+								"name": "calls",
+								"type": "tuple[]"
+							},
+							{
+								"internalType": "uint256",
+								"name": "recentBlock",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct Delegate.ChainBatch[]",
+						"name": "chainBatches",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct Delegate.Intent",
+				"name": "intent",
+				"type": "tuple"
+			}
+		],
+		"name": "computeIntentHash",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "hash",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	}
+] as const;
 
 // Export all ABIs as a single object for convenience
 export const ABIS = {

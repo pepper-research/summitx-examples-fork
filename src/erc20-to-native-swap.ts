@@ -72,10 +72,10 @@ async function main() {
 
   logger.info(`USDC Balance: ${formatUnits(usdcBalance, 6)}`);
 
-  if (usdcBalance < parseUnits("0.5", 6)) {
-    logger.error("Insufficient USDC balance. Need at least 0.5 USDC");
-    process.exit(1);
-  }
+  // if (usdcBalance < parseUnits("0.5", 6)) {
+  //   logger.error("Insufficient USDC balance. Need at least 0.5 USDC");
+  //   process.exit(1);
+  // }
 
   // Initialize quoter
   const quoter = new TokenQuoter({

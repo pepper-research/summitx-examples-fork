@@ -116,7 +116,7 @@ async function main() {
     // solver on baseCampTestnet sends CAMP to user
     {
       chainId: basecampTestnet.id,
-      recentBlock: recentBlockBaseCamp,
+      recentBlock: recentBlockBaseCamp + 8n,
       calls: [
         {
           to: user.address,
@@ -163,6 +163,8 @@ async function main() {
 
   await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
   console.log("Source chain tx:", sourceChainTx);
+
+  waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
 
   const destinationChainTx = await destinationWalletClient.writeContract({
     authorizationList: [solverAuthDestination, userAuthDestination],

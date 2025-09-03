@@ -10,7 +10,7 @@ import {
 } from "viem";
 import { logger } from "./utils/logger";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
+import { sepolia, basecampTestnet as bct } from "viem/chains";
 import { Percent, TradeType } from "@summitx/swap-sdk-core";
 import { SEPOLIA_DELEGATE, BASECAMP_DELEGATE } from "./config/contracts";
 import { getIntentHash, hashChainBatches, selectChainForChainBatches } from "./utils/spiceflow-helpers";
@@ -42,7 +42,7 @@ async function main() {
     });
 
     const destinationClient = createPublicClient({
-        chain: basecampTestnet,
+        chain: bct,
         transport: http(),
     });
 
@@ -52,7 +52,7 @@ async function main() {
     });
 
     const destinationWalletClient = createWalletClient({
-        chain: basecampTestnet,
+        chain: bct,
         transport: http(),
     });
 
@@ -72,37 +72,18 @@ async function main() {
     const depositAmount = parseUnits("0.0001", 18);
     const gasFee = parseUnits("0.00001", 18);
 
-    // Fetch the current nonce for the user on each chain
-    const nonceSepolia = await sourceClient.getTransactionCount(user);
-    const nonceBaseCamp = await destinationClient.getTransactionCount(user);
-
-    const delegateAddressSource = getAddress(SEPOLIA_DELEGATE);
-    const delegateAddressDestination = getAddress(BASECAMP_DELEGATE);
-
     // User signs an authorization for Sepolia
     const userAuthSource = await user.signAuthorization({
-        address: delegateAddressSource,
+        address: SEPOLIA_DELEGATE,
         chainId: sepolia.id,
-        nonce: nonceSepolia,
+        nonce: await sourceClient.getTransactionCount(user),
     });
 
     // User signs another authorization for baseCampTestnet
     const userAuthDestination = await user.signAuthorization({
-        address: delegateAddressDestination,
-        chainId: basecampTestnet.id,
-        nonce: nonceBaseCamp,
-    });
-
-    const solverAuthSource = await solver.signAuthorization({
-        address: delegateAddressSource,
-        chainId: sepolia.id,
-        nonce: nonceSepolia,
-    });
-
-    const solverAuthDestination = await solver.signAuthorization({
-        address: delegateAddressDestination,
-        chainId: basecampTestnet.id,
-        nonce: nonceBaseCamp,
+        address: BASECAMP_DELEGATE,
+        chainId: bct.id,
+        nonce: await destinationClient.getTransactionCount(user),
     });
 
     const recentBlockSepolia = await sourceClient.getBlockNumber();
@@ -119,59 +100,43 @@ async function main() {
 
     await delay(2000);
 
-    const swapAmount = "0.5"; // 0.01 USDC
+    const swapAmount = "0.1";
 
-    // quote for USDC -> WCAMP
+    // Get quote
     const quote = await quoter.getQuote(
-        baseCampTestnetTokens.usdc,
         baseCampTestnetTokens.wcamp,
+        baseCampTestnetTokens.usdc,
         swapAmount,
         TradeType.EXACT_INPUT,
         false
     )
 
     if (!quote || !quote.rawTrade) {
-        logger.error("No route found for USDC → CAMP");
+        logger.error("No route found for CAMP → USDC... ");
         process.exit(1);
     }
 
     logger.success("Quote received:", {
-        input: `${swapAmount} USDC`,
-        output: `${quote.outputAmount} CAMP`,
+        input: `${swapAmount} CAMP`,
+        output: `${quote.outputAmount} USDC`,
         priceImpact: quote.priceImpact,
         route: quote.route,
     });
 
-    // Approve USDC for the smart router
-    await approveTokenWithWait(
-        solver,
-        destinationClient,
-        baseCampTestnetTokens.usdc.address as Address,
-        SMART_ROUTER_ADDRESS as Address,
-        parseUnits(swapAmount, 6),
-        "USDC",
-        3000 // 3 second wait after approval
-    );
-
     const trade = quote.rawTrade;
+
     const methodParameters = SwapRouter.swapCallParameters(trade, {
         slippageTolerance: new Percent(100, 10000), // 1%
         deadline: Math.floor(Date.now() / 1000) + 60 * 20,
         recipient: user.address,
-    })
+    });
 
-    const WETH_ABI = [
-        {
-            name: "withdraw",
-            type: "function",
-            inputs: [{ name: "wad", type: "uint256" }],
-            outputs: [],
-            stateMutability: "nonpayable",
-        },
-    ] as const;
+    const nativeValue = parseUnits(swapAmount, 18);
+
+    console.log("Method params:", methodParameters);
 
     // sepolia: user -> ether -> escrow
-    // basecamp: USDC -swap-> WCAMP -unwrap-> CAMP -> user
+    // basecamp: WCAMP -swap-> USDC -> user
 
     const chainBatches = hashChainBatches([
         // user on sepolia sends ether to escrow
@@ -181,36 +146,20 @@ async function main() {
             calls: [
                 {
                     to: escrow,
-                    value: depositAmount + gasFee,
+                    value: depositAmount,
                     data: "0x",
                 }
             ]
         },
-        // solver swaps USDC to WCAMP
+        // user swaps CAMP to USDC
         {
-            chainId: basecampTestnet.id,
+            chainId: bct.id,
             recentBlock: recentBlockBaseCamp + 8n,
             calls: [
                 {
                     to: SMART_ROUTER_ADDRESS as Address,
-                    value: 0n,
+                    value: nativeValue,
                     data: methodParameters.calldata,
-                }
-            ]
-        },
-        // solver unwraps WCAMP to CAMP
-        {
-            chainId: basecampTestnet.id,
-            recentBlock: recentBlockBaseCamp + 8n,
-            calls: [
-                {
-                    to: WCAMP_ADDRESS as Address,
-                    data: encodeFunctionData({
-                        abi: WETH_ABI,
-                        functionName: "withdraw",
-                        args: [depositAmount]
-                    }),
-                    value: 0n
                 }
             ]
         }
@@ -222,9 +171,22 @@ async function main() {
         message: { raw: digest },
     });
 
+    const solverAuthSource = await solver.signAuthorization({
+        address: SEPOLIA_DELEGATE,
+        chainId: sepolia.id,
+        nonce: await sourceClient.getTransactionCount(solver) + 1,
+    });
+
+    const solverAuthDestination = await solver.signAuthorization({
+        address: BASECAMP_DELEGATE,
+        chainId: bct.id,
+        nonce: await destinationClient.getTransactionCount(solver) + 1,
+    });
+
     waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
 
     const sourceChainTx = await sourceWalletClient.writeContract({
+        // gas: 3000000n,
         authorizationList: [solverAuthSource, userAuthSource],
         address: solver.address,
         abi: DELEGATE_ABI,
@@ -262,28 +224,34 @@ async function main() {
         account: solver,
         functionName: "selfExecute",
         args: [
-            [{
-                to: user.address,
-                data: encodeFunctionData({
-                    abi: DELEGATE_ABI,
-                    functionName: "execute",
-                    args: [
-                        {
-                            signature: signature,
-                            chainBatches: selectChainForChainBatches(chainBatches, {
-                                chainId: BigInt(basecampTestnet.id)
-                            }),
-                        }
-                    ]
-                }),
-                value: 0n
-            }]
+            [
+                {
+                    to: user.address,
+                    data: "0x",
+                    value: nativeValue + gasFee,
+                },
+                {
+                    to: user.address,
+                    data: encodeFunctionData({
+                        abi: DELEGATE_ABI,
+                        functionName: "execute",
+                        args: [
+                            {
+                                signature: signature,
+                                chainBatches: selectChainForChainBatches(chainBatches, {
+                                    chainId: BigInt(basecampTestnet.id)
+                                }),
+                            }
+                        ]
+                    }),
+                    value: 0n
+                }
+            ]
         ]
     }) as Hash;
 
     await destinationClient.waitForTransactionReceipt({ hash: destinationChainTx });
     console.log("Destination chain tx:", destinationChainTx);
-
 };
 
 main().catch((err) => {

@@ -11,6 +11,8 @@
     "swap:all": "tsx src/swap-examples.ts",
     "swap:crosschain-native": "tsx src/crosschain-native-swap.ts",
     "swap:crosschain-erc20-to-native": "tsx src/crosschain-erc20-to-native-swap.ts",
+    "swap:crosschain-erc20-to-erc20": "tsx src/crosschain-erc20-to-erc20-swap.ts",
+    "swap:crosschain-native-to-erc20": "tsx src/crosschain-native-to-erc20-swap.ts",
     "swap:native-to-erc20": "tsx src/native-to-erc20-swap.ts",
     "swap:erc20-to-native": "tsx src/erc20-to-native-swap.ts",
     "swap:erc20-to-native-multicall": "tsx src/erc20-to-native-multicall.ts",

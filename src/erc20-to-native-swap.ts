@@ -46,7 +46,7 @@ async function main() {
     process.exit(1);
   }
 
-  const account = privateKeyToAccount(process.env.PRIVATE_KEY as Hex);
+  const account = privateKeyToAccount(process.env.SOLVER_PRIVATE_KEY as Hex);
 
   const publicClient = createPublicClient({
     chain: basecampTestnet,

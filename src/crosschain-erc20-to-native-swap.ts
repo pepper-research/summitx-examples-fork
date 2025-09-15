@@ -74,20 +74,6 @@ async function main() {
     const depositAmount = parseUnits("0.0001", 18);
     const gasFee = parseUnits("0.00001", 18);
 
-    // User signs an authorization for Sepolia
-    const userAuthSource = await user.signAuthorization({
-        address: SEPOLIA_DELEGATE,
-        chainId: sepolia.id,
-        nonce: await sourceClient.getTransactionCount(user),
-    });
-
-    // User signs another authorization for baseCampTestnet
-    const userAuthDestination = await user.signAuthorization({
-        address: BASECAMP_DELEGATE,
-        chainId: bct.id,
-        nonce: await destinationClient.getTransactionCount(user),
-    });
-
     const quoter = new TokenQuoter({
         rpcUrl: basecampTestnet.rpcUrls.default.http[0],
         slippageTolerance: 1.0,
@@ -192,6 +178,20 @@ async function main() {
 
     const signature = await user.signMessage({
         message: { raw: digest },
+    });
+
+    // User signs an authorization for Sepolia
+    const userAuthSource = await user.signAuthorization({
+        address: SEPOLIA_DELEGATE,
+        chainId: sepolia.id,
+        nonce: await sourceClient.getTransactionCount(user),
+    });
+
+    // User signs another authorization for baseCampTestnet
+    const userAuthDestination = await user.signAuthorization({
+        address: BASECAMP_DELEGATE,
+        chainId: bct.id,
+        nonce: await destinationClient.getTransactionCount(user),
     });
 
     const solverAuthSource = await solver.signAuthorization({

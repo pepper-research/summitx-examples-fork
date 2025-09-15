@@ -6,7 +6,8 @@ import {
     createPublicClient,
     encodeFunctionData,
     Hash,
-    Address
+    Address,
+    formatUnits,
 } from "viem";
 import { logger } from "./utils/logger";
 import { privateKeyToAccount } from "viem/accounts";
@@ -46,11 +47,13 @@ async function main() {
     });
 
     const sourceWalletClient = createWalletClient({
+        account: solver,
         chain: sepolia,
         transport: http(),
     });
 
     const destinationWalletClient = createWalletClient({
+        account: solver,
         chain: bct,
         transport: http(),
     });
@@ -84,9 +87,6 @@ async function main() {
         chainId: bct.id,
         nonce: await destinationClient.getTransactionCount(user),
     });
-
-    const recentBlockSepolia = await sourceClient.getBlockNumber();
-    const recentBlockBaseCamp = await destinationClient.getBlockNumber();
 
     const quoter = new TokenQuoter({
         rpcUrl: basecampTestnet.rpcUrls.default.http[0],
@@ -122,12 +122,26 @@ async function main() {
         route: quote.route,
     });
 
+    // Check initial native balance
+    const initialNativeBalance = await sourceClient.getBalance({
+        address: user.address,
+    });
+    logger.info(
+        `Initial CAMP balance: ${formatUnits(
+            initialNativeBalance,
+            basecampTestnet.nativeCurrency.decimals
+        )}`
+    );
+
+    // Approve USDC for swap with waiting period
     await approveTokenWithWait(
         destinationWalletClient,
         destinationClient,
         baseCampTestnetTokens.usdc.address,
         SMART_ROUTER_ADDRESS,
-        parseUnits(swapAmount, baseCampTestnetTokens.usdc.decimals)
+        parseUnits(swapAmount, baseCampTestnetTokens.usdc.decimals),
+        baseCampTestnetTokens.usdc.symbol,
+        3000
     );
 
     const trade = quote.rawTrade;
@@ -140,6 +154,9 @@ async function main() {
     const nativeValue = parseUnits(swapAmount, 18);
 
     console.log("Method params:", methodParameters);
+
+    const recentBlockSepolia = await sourceClient.getBlockNumber();
+    const recentBlockBaseCamp = await destinationClient.getBlockNumber();
 
     // sepolia: user -> ether -> escrow
     // basecamp: WCAMP -swap-> USDC -> user

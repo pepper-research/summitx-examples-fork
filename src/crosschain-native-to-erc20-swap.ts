@@ -99,7 +99,7 @@ async function main() {
 
     await delay(2000);
 
-    const swapAmount = "0.5"; // 0.5 USDC
+    const swapAmount = "0.000005"; // 0.5 USDC
 
     // Get quote
     const quote = await quoter.getQuote(
@@ -132,6 +132,20 @@ async function main() {
     });
 
     const nativeValue = parseUnits(swapAmount, 18);
+
+    await approveTokenWithWait(
+        createWalletClient({
+            account: user,
+            chain: bct,
+            transport: http(),
+        }),
+        destinationClient,
+        baseCampTestnetTokens.wcamp.address,
+        SMART_ROUTER_ADDRESS,
+        parseUnits(swapAmount, baseCampTestnetTokens.wcamp.decimals),
+        baseCampTestnetTokens.wcamp.symbol,
+        3000
+    );
 
     console.log("Method params:", methodParameters);
 
@@ -183,42 +197,41 @@ async function main() {
         nonce: await destinationClient.getTransactionCount(solver) + 1,
     });
 
-    waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
+    // await waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
 
-    const sourceChainTx = await sourceWalletClient.writeContract({
-        gas: 3000000n,
-        authorizationList: [solverAuthSource, userAuthSource],
-        address: solver.address,
-        abi: DELEGATE_ABI,
-        account: solver,
-        functionName: "selfExecute",
-        args: [
-            [{
-                to: user.address,
-                data: encodeFunctionData({
-                    abi: DELEGATE_ABI,
-                    functionName: "execute",
-                    args: [
-                        {
-                            signature: signature,
-                            chainBatches: selectChainForChainBatches(chainBatches, {
-                                chainId: BigInt(sepolia.id)
-                            }),
-                        }
-                    ]
-                }),
-                value: 0n
-            }]
-        ]
-    }) as Hash;
+    // const sourceChainTx = await sourceWalletClient.writeContract({
+    //     gas: 3000000n,
+    //     authorizationList: [solverAuthSource, userAuthSource],
+    //     address: solver.address,
+    //     abi: DELEGATE_ABI,
+    //     account: solver,
+    //     functionName: "selfExecute",
+    //     args: [
+    //         [{
+    //             to: user.address,
+    //             data: encodeFunctionData({
+    //                 abi: DELEGATE_ABI,
+    //                 functionName: "execute",
+    //                 args: [
+    //                     {
+    //                         signature: signature,
+    //                         chainBatches: selectChainForChainBatches(chainBatches, {
+    //                             chainId: BigInt(sepolia.id)
+    //                         }),
+    //                     }
+    //                 ]
+    //             }),
+    //             value: 0n
+    //         }]
+    //     ]
+    // }) as Hash;
 
-    await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
-    console.log("Source chain tx:", sourceChainTx);
+    // await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
+    // console.log("Source chain tx:", sourceChainTx);
 
-    waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
+    await waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
 
     const destinationChainTx = await destinationWalletClient.writeContract({
-        gas: 3000000n,
         authorizationList: [solverAuthDestination, userAuthDestination],
         address: solver.address,
         abi: DELEGATE_ABI,

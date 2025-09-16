@@ -85,7 +85,7 @@ async function main() {
 
     await delay(2000);
 
-    const swapAmount = "0.5"; // 0.5 USDC
+    const swapAmount = "0.00005"; // 0.5 USDC
 
     // Get quote
     const quote = await quoter.getQuote(
@@ -121,7 +121,11 @@ async function main() {
 
     // Approve USDC for swap with waiting period
     await approveTokenWithWait(
-        destinationWalletClient,
+        createWalletClient({
+            account: user,
+            chain: bct,
+            transport: http(),
+        }),
         destinationClient,
         baseCampTestnetTokens.usdc.address,
         SMART_ROUTER_ADDRESS,
@@ -206,7 +210,7 @@ async function main() {
         nonce: await destinationClient.getTransactionCount(solver) + 1,
     });
 
-    waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
+    await waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
 
     const sourceChainTx = await sourceWalletClient.writeContract({
         gas: 3000000n,
@@ -238,7 +242,7 @@ async function main() {
     await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
     console.log("Source chain tx:", sourceChainTx);
 
-    waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
+    await waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
 
     const destinationChainTx = await destinationWalletClient.writeContract({
         gas: 3000000n,
@@ -247,13 +251,22 @@ async function main() {
         abi: DELEGATE_ABI,
         account: solver,
         functionName: "selfExecute",
+        // args: [
+        //     [
+        //         {
+        //             to: SMART_ROUTER_ADDRESS as Address,
+        //             value: nativeValue,
+        //             data: methodParameters.calldata,
+        //         }
+        //     ]
+        // ]
         args: [
             [
-                {
-                    to: user.address,
-                    data: "0x",
-                    value: nativeValue + gasFee,
-                },
+                // {
+                //     to: user.address,
+                //     data: "0x",
+                //     value: nativeValue + gasFee,
+                // },
                 {
                     to: user.address,
                     data: encodeFunctionData({

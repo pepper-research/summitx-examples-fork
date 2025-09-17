@@ -79,7 +79,7 @@ async function main() {
         slippageTolerance: 1.0,
         maxHops: 2,
         maxSplits: 2,
-        enableV2: false,
+        enableV2: true,
         enableV3: true,
     });
 
@@ -90,20 +90,20 @@ async function main() {
     // Get quote
     const quote = await quoter.getQuote(
         baseCampTestnetTokens.usdc,
-        baseCampTestnetTokens.wcamp,
+        baseCampTestnetTokens.usdt,
         swapAmount,
         TradeType.EXACT_INPUT,
         false
     )
 
     if (!quote || !quote.rawTrade) {
-        logger.error("No route found for CAMP → USDC... ");
+        logger.error("No route found for USDC → USDT... ");
         process.exit(1);
     }
 
     logger.success("Quote received:", {
-        input: `${swapAmount} CAMP`,
-        output: `${quote.outputAmount} USDC`,
+        input: `${swapAmount} USDC`,
+        output: `${quote.outputAmount} USDT`,
         priceImpact: quote.priceImpact,
         route: quote.route,
     });
@@ -113,7 +113,7 @@ async function main() {
         address: user.address,
     });
     logger.info(
-        `Initial CAMP balance: ${formatUnits(
+        `Initial USDT balance: ${formatUnits(
             initialNativeBalance,
             basecampTestnet.nativeCurrency.decimals
         )}`
@@ -129,7 +129,7 @@ async function main() {
         destinationClient,
         baseCampTestnetTokens.usdc.address,
         SMART_ROUTER_ADDRESS,
-        parseUnits(swapAmount, baseCampTestnetTokens.usdc.decimals),
+        parseUnits(swapAmount, baseCampTestnetTokens.usdt.decimals),
         baseCampTestnetTokens.usdc.symbol,
         3000
     );
@@ -149,7 +149,7 @@ async function main() {
     const recentBlockBaseCamp = await destinationClient.getBlockNumber();
 
     // sepolia: user -> ether -> escrow
-    // basecamp: WCAMP -swap-> USDC -> user
+    // basecamp: USDC -swap-> USDT -> user
 
     const chainBatches = hashChainBatches([
         // user on sepolia sends ether to escrow
@@ -212,37 +212,37 @@ async function main() {
 
     await waitForBlock(sourceClient, recentBlockSepolia).then(() => console.log("Source chain wait complete"));
 
-    // const sourceChainTx = await sourceWalletClient.writeContract({
-    //     gas: 3000000n,
-    //     authorizationList: [solverAuthSource, userAuthSource],
-    //     address: solver.address,
-    //     abi: DELEGATE_ABI,
-    //     account: solver,
-    //     functionName: "selfExecute",
-    //     args: [
-    //         [{
-    //             to: user.address,
-    //             data: encodeFunctionData({
-    //                 abi: DELEGATE_ABI,
-    //                 functionName: "execute",
-    //                 args: [
-    //                     {
-    //                         signature: signature,
-    //                         chainBatches: selectChainForChainBatches(chainBatches, {
-    //                             chainId: BigInt(sepolia.id)
-    //                         }),
-    //                     }
-    //                 ]
-    //             }),
-    //             value: 0n
-    //         }]
-    //     ]
-    // }) as Hash;
+    const sourceChainTx = await sourceWalletClient.writeContract({
+        gas: 3000000n,
+        authorizationList: [solverAuthSource, userAuthSource],
+        address: solver.address,
+        abi: DELEGATE_ABI,
+        account: solver,
+        functionName: "selfExecute",
+        args: [
+            [{
+                to: user.address,
+                data: encodeFunctionData({
+                    abi: DELEGATE_ABI,
+                    functionName: "execute",
+                    args: [
+                        {
+                            signature: signature,
+                            chainBatches: selectChainForChainBatches(chainBatches, {
+                                chainId: BigInt(sepolia.id)
+                            }),
+                        }
+                    ]
+                }),
+                value: 0n
+            }]
+        ]
+    }) as Hash;
 
-    // await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
-    // console.log("Source chain tx:", sourceChainTx);
+    await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
+    console.log("Source chain tx:", sourceChainTx);
 
-    waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
+    await waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
 
     const destinationChainTx = await destinationWalletClient.writeContract({
         gas: 3000000n,

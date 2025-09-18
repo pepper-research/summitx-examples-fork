@@ -24,6 +24,7 @@ import {
     SMART_ROUTER_ADDRESS,
 } from "./config/base-testnet";
 import { SwapRouter } from "@summitx/smart-router/evm";
+import { encode } from "punycode";
 
 async function main() {
     // A sample user account
@@ -57,6 +58,29 @@ async function main() {
         chain: bct,
         transport: http(),
     });
+
+    const ERC20_ABI = [
+        {
+            name: "approve",
+            type: "function",
+            inputs: [
+                { name: "spender", type: "address" },
+                { name: "amount", type: "uint256" },
+            ],
+            outputs: [{ name: "", type: "bool" }],
+            stateMutability: "nonpayable",
+        },
+        {
+            name: "allowance",
+            type: "function",
+            inputs: [
+                { name: "owner", type: "address" },
+                { name: "spender", type: "address" },
+            ],
+            outputs: [{ name: "", type: "uint256" }],
+            stateMutability: "view",
+        },
+    ] as const;
 
     const waitForBlock = async (client: ReturnType<typeof createPublicClient>, block: bigint) => {
         console.warn(`Waiting for block ${block + 1n}...`);
@@ -119,21 +143,6 @@ async function main() {
         )}`
     );
 
-    // Approve USDC for swap with waiting period
-    await approveTokenWithWait(
-        createWalletClient({
-            account: user,
-            chain: bct,
-            transport: http(),
-        }),
-        destinationClient,
-        baseCampTestnetTokens.usdc.address,
-        SMART_ROUTER_ADDRESS,
-        parseUnits(swapAmount, baseCampTestnetTokens.usdc.decimals),
-        baseCampTestnetTokens.usdc.symbol,
-        3000
-    );
-
     const trade = quote.rawTrade;
     const methodParameters = SwapRouter.swapCallParameters(trade, {
         slippageTolerance: new Percent(100, 10000), // 1%
@@ -164,11 +173,23 @@ async function main() {
                 }
             ]
         },
-        // user swaps USDC to WCAMP
+        // user calls on basecampTestnet
         {
             chainId: bct.id,
             recentBlock: recentBlockBaseCamp + 8n,
             calls: [
+                {
+                    to: baseCampTestnetTokens.usdc.address,
+                    value:0n,
+                    data: encodeFunctionData({
+                        abi: ERC20_ABI,
+                        functionName: "approve",
+                        args: [
+                            SMART_ROUTER_ADDRESS,
+                            parseUnits(swapAmount, baseCampTestnetTokens.usdc.decimals)
+                        ]
+                    })
+                },
                 {
                     to: SMART_ROUTER_ADDRESS as Address,
                     value: nativeValue,
@@ -242,7 +263,7 @@ async function main() {
     // await sourceClient.waitForTransactionReceipt({ hash: sourceChainTx });
     // console.log("Source chain tx:", sourceChainTx);
 
-    waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
+    await waitForBlock(destinationClient, recentBlockBaseCamp + 8n).then(() => console.log("Destination chain wait complete"));
 
     const destinationChainTx = await destinationWalletClient.writeContract({
         gas: 3000000n,

@@ -109,7 +109,7 @@ async function main() {
 
     await delay(2000);
 
-    const swapAmount = "0.5"; // 0.5 USDC
+    const swapAmount = "0.001"; // 0.5 USDC
 
     // Get quote
     const quote = await quoter.getQuote(
@@ -149,8 +149,6 @@ async function main() {
         deadline: Math.floor(Date.now() / 1000) + 60 * 20,
         recipient: user.address,
     });
-
-    const nativeValue = parseUnits(swapAmount, 18);
 
     console.log("Method params:", methodParameters);
 
@@ -192,7 +190,7 @@ async function main() {
                 },
                 {
                     to: SMART_ROUTER_ADDRESS as Address,
-                    value: nativeValue,
+                    value: 0n,
                     data: methodParameters.calldata,
                 }
             ]
